@@ -16,6 +16,11 @@ class Word(object):
 
 
 @dataclass(frozen=True)
+class QuotedWord(Word):
+    pass
+
+
+@dataclass(frozen=True)
 class File(object):
     name: str
 
@@ -64,7 +69,7 @@ class OperatorOr(object):
 class Command(object):
     command: Word
     args: Collection[Word] = field(default_factory=tuple)
-    redirect_to: Optional[str] = None
+    redirect_to: Optional[File] = None
     redirect_to_operator: Optional[Union[RedirectionOutput, RedirectionAppend]] = None
     pipe_command: Optional[COMMAND_TYPE] = None
     next_command: Optional[COMMAND_TYPE] = None
@@ -73,23 +78,27 @@ class Command(object):
 
     def __post_init__(self):
         if self.redirect_to and not self.redirect_to_operator:
-            raise Exception()
+            raise InvalidCommandDataException("Redirection file set, but no redirection operator set.")
         if not self.redirect_to and self.redirect_to_operator:
-            raise Exception()
+            raise InvalidCommandDataException("Redirection operator set, but no redirection file set.")
         if self.next_command_operator and not self.next_command:
-            raise Exception()
+            raise InvalidCommandDataException("Next command operator set, but no next command set.")
 
     @property
     def command_line(self) -> str:
         command_line = shlex_quote(str(self.command))
         if self.args:
-            command_line += " " + " ".join((shlex_quote(arg) for arg in self.args))
+            command_line += " " + " ".join((shlex_quote(str(arg)) for arg in self.args))
         if self.redirect_to:
-            command_line += " " + str(self.redirect_to_operator) + " " + str(self.redirect_to)
+            command_line += " " + str(self.redirect_to_operator) + " " + shlex_quote(str(self.redirect_to))
         return command_line
 
     def __str__(self):
         return self.command_line
+
+
+class InvalidCommandDataException(Exception):
+    pass
 
 
 @dataclass(eq=False)
@@ -104,7 +113,7 @@ class CommandBuilder(object):
 
     def create(self) -> Command:
         if len(self.words) == 0:
-            raise Exception()
+            raise CommandBuilderCreateException("No command words added.")
         elif len(self.words) == 1:
             command = self.words[0]
             args = tuple()
@@ -145,9 +154,14 @@ class NestedCommandList(object):
     asynchronous: bool = False
 
 
+class CommandBuilderCreateException(Exception):
+    pass
+
+
 __all__ = [
     "COMMAND_TYPE",
     "Word",
+    "QuotedWord",
     "File",
     "Pipe",
     "RedirectionOutput",
@@ -155,6 +169,8 @@ __all__ = [
     "OperatorAnd",
     "OperatorOr",
     "Command",
+    "InvalidCommandDataException",
     "CommandBuilder",
+    "CommandBuilderCreateException",
     "NestedCommandList",
 ]
