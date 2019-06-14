@@ -16,11 +16,6 @@ def strip_quotes(arg: str) -> str:
     return arg
 
 
-def assert_no_redirections(cmd: Command):
-    assert cmd.redirect_to is None
-    assert cmd.redirect_to_operator is None
-
-
 def assert_single_cmd(cmd: Command):
     assert cmd.pipe_command is None
     assert cmd.next_command is None
@@ -78,11 +73,12 @@ def test_single_word(parser: Parser, line: str, expected_str: Word):
     first_cmd = parser.parse(line)
     assert first_cmd.command == expected_str
     assert len(first_cmd.args) == 0
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
     assert first_cmd.asynchronous == False
 
 
+@pytest.mark.parametrize("before_space_count", range(0, 4))
+@pytest.mark.parametrize("after_space_count", range(0, 4))
 @pytest.mark.parametrize("manual,nonmanual", (
     ("plainword;", "plainword"),
     ("plainword ;", "plainword "),
@@ -97,21 +93,15 @@ def test_single_word(parser: Parser, line: str, expected_str: Word):
     (r"'one\ word';", r"'one\ word'"),
     (r'"one\ word";', r'"one\ word"'),
 ))
-def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual: str):
-    def check(_manual, _nonmanual):
-        manual_first_cmd = parser.parse(_manual)
-        nonmanual_first_cmd = parser.parse(_nonmanual)
-        assert manual_first_cmd == nonmanual_first_cmd
-        assert_no_redirections(manual_first_cmd)
-        assert_single_cmd(manual_first_cmd)
-        assert manual_first_cmd.asynchronous == False
-
-    check(manual, nonmanual)
-    for before_space_count in range(0, 5):
-        before_spaces = " " * before_space_count
-        for after_space_count in range(0, 5):
-            after_spaces = " " * after_space_count
-            check(manual.replace(";", before_spaces + ";" + after_spaces), nonmanual)
+def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual: str, before_space_count: int, after_space_count: int):
+    before_spaces = " " * before_space_count
+    after_spaces = " " * after_space_count
+    _manual = manual.replace(";", before_spaces + ";" + after_spaces)
+    manual_first_cmd = parser.parse(_manual)
+    nonmanual_first_cmd = parser.parse(nonmanual)
+    assert manual_first_cmd == nonmanual_first_cmd
+    assert_single_cmd(manual_first_cmd)
+    assert manual_first_cmd.asynchronous == False
 
 
 @pytest.mark.parametrize("line,command_word,args_words", (
@@ -127,13 +117,16 @@ def test_multiple_words(parser: Parser, line: str, command_word: Word, args_word
     first_cmd = parser.parse(line)
     assert first_cmd.command == command_word
     assert first_cmd.args == args_words
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
 
 
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 arg\\ 1", "cmd1 'arg 1'"),
     ("cmd\\ 1", "'cmd 1'"),
+    ("cmd\\ 1a", "'cmd 1a'"),
+    ("cmd\\ 12", "'cmd 12'"),
+    ("cmd\\ 12a", "'cmd 12a'"),
+    ("cmd\\ 12ab", "'cmd 12ab'"),
     ("cmd\\ 1 arg\\ 1\\ arg\\ 2", "'cmd 1' 'arg 1 arg 2'"),
     ("cmd\\ 1\\;", "'cmd 1;'"),
     ("cmd\\;\\ 1 arg\\$1", "'cmd; 1' 'arg$1'"),
@@ -168,7 +161,6 @@ def test_escaping_outside_quotes(parser: Parser, line: str, expected_str: str):
     def check(_line: str):
         first_cmd = parser.parse(_line)
         assert str(first_cmd) == expected_str
-        assert_no_redirections(first_cmd)
         assert_single_cmd(first_cmd)
         assert first_cmd.asynchronous == False
 
@@ -188,7 +180,6 @@ def test_escaping_outside_quotes(parser: Parser, line: str, expected_str: str):
 def test_escaping_inside_single_quotes(parser: Parser, line: str, expected_str: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
     assert first_cmd.asynchronous == False
 
@@ -202,7 +193,6 @@ def test_escaping_inside_single_quotes(parser: Parser, line: str, expected_str: 
 def test_escaping_inside_double_quotes(parser: Parser, line: str, expected_str: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
     assert first_cmd.asynchronous == False
 
@@ -216,7 +206,6 @@ def test_escaping_inside_double_quotes(parser: Parser, line: str, expected_str: 
 def test_mixing_quotes(parser: Parser, line: str, expected_str: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
     assert first_cmd.asynchronous == False
 
@@ -236,7 +225,6 @@ def test_mixing_quotes(parser: Parser, line: str, expected_str: str):
 def test_empty_string_args(parser: Parser, line: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == "cmd1 ''"
-    assert_no_redirections(first_cmd)
     assert_single_cmd(first_cmd)
     assert first_cmd.asynchronous == False
 
@@ -253,14 +241,12 @@ def test_empty_string_args(parser: Parser, line: str):
 ))
 def test_multiple_plain_commands(parser: Parser, line: str, expected_cmd_count: int):
     first_cmd = parser.parse(line)
-    assert_no_redirections(first_cmd)
     assert first_cmd.next_command_operator is None
 
     actual_cmd_count = 1
     cur_cmd = first_cmd.next_command
     while cur_cmd:
         actual_cmd_count += 1
-        assert_no_redirections(first_cmd)
         assert cur_cmd.next_command_operator is None
 
         cur_cmd = cur_cmd.next_command
@@ -280,7 +266,6 @@ def test_multiple_plain_commands(parser: Parser, line: str, expected_cmd_count: 
 ))
 def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected_cmd_count: int, expected_str: str):
     first_cmd = parser.parse(line)
-    assert_no_redirections(first_cmd)
     assert first_cmd.next_command is None
     assert first_cmd.next_command_operator is None
 
@@ -288,7 +273,6 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     cur_cmd = first_cmd.pipe_command
     while cur_cmd:
         actual_cmd_count += 1
-        assert_no_redirections(first_cmd)
         assert cur_cmd.next_command is None
         assert cur_cmd.next_command_operator is None
 
@@ -298,6 +282,7 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     assert formatter.format_statement(first_cmd) == expected_str
 
 
+@pytest.mark.parametrize("space_count", range(-1, 4))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 > testfile.txt", "cmd1 > testfile.txt"),
     ("cmd1 arg1 > testfile.txt", "cmd1 arg1 > testfile.txt"),
@@ -312,7 +297,7 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     ("> testfile.txt cmd1 arg1", "cmd1 arg1 > testfile.txt"),
     ("> \"testfile.txt\" cmd1 'arg1 arg2'", "cmd1 'arg1 arg2' > testfile.txt"),
 ))
-def test_redirect_output(parser: Parser, line: str, expected_str: str):
+def test_redirect_output(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped appends
     def check(_line: str):
         first_cmd = parser.parse(_line)
@@ -323,17 +308,17 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str):
         assert first_cmd.redirect_to == File("testfile.txt")
         assert isinstance(first_cmd.redirect_to_operator, RedirectionOutput)
 
-    # We check the vanilla statement as provided by the fixture, but we also
-    # check the same statement with whitespace removed from one or both sides
-    # of the operator. They should all produce identical results.
-    check(line)
-    for space_count in range(0, 5):
-        spaces = " " * space_count
-        check(line.replace("> ", spaces + ">" + spaces))
-        check(line.replace(" >", spaces + ">" + spaces))
-        check(line.replace(" > ", spaces + ">" + spaces))
+    if space_count < 0:
+        check(line)
+        return
+
+    spaces = " " * space_count
+    check(line.replace("> ", spaces + ">" + spaces))
+    check(line.replace(" >", spaces + ">" + spaces))
+    check(line.replace(" > ", spaces + ">" + spaces))
 
 
+@pytest.mark.parametrize("space_count", range(-1, 4))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 >> testfile.txt", "cmd1 >> testfile.txt"),
     ("cmd1 arg1 >> testfile.txt", "cmd1 arg1 >> testfile.txt"),
@@ -348,7 +333,7 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str):
     (">> testfile.txt cmd1 arg1", "cmd1 arg1 >> testfile.txt"),
     (">> \"testfile.txt\" cmd1 'arg1 arg2'", "cmd1 'arg1 arg2' >> testfile.txt"),
 ))
-def test_redirect_append(parser: Parser, line: str, expected_str: str):
+def test_redirect_append(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped outputs 
     def check(_line: str):
         first_cmd = parser.parse(line)
@@ -359,17 +344,19 @@ def test_redirect_append(parser: Parser, line: str, expected_str: str):
         assert first_cmd.redirect_to == File("testfile.txt")
         assert isinstance(first_cmd.redirect_to_operator, RedirectionAppend)
 
-    # We check the vanilla statement as provided by the fixture, but we also
-    # check the same statement with whitespace removed from one or both sides
-    # of the operator. They should all produce identical results.
-    check(line)
-    for space_count in range(0, 5):
-        spaces = " " * space_count
-        check(line.replace(">> ", spaces + ">>" + spaces))
-        check(line.replace(" >>", spaces + ">>" + spaces))
-        check(line.replace(" >> ", spaces + ">>" + spaces))
+    if space_count < 0:
+        check(line)
+        return
+
+    spaces = " " * space_count
+    check(line.replace(">> ", spaces + ">>" + spaces))
+    check(line.replace(" >>", spaces + ">>" + spaces))
+    check(line.replace(" >> ", spaces + ">>" + spaces))
 
 
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 arg1 > file1.txt | cmd2 arg1 arg2", "cmd1 arg1 > file1.txt | cmd2 arg1 arg2"),
     ("cmd1 'arg1 arg2' > file1.txt | cmd2 arg1 ", "cmd1 'arg1 arg2' > file1.txt | cmd2 arg1"),
@@ -377,7 +364,7 @@ def test_redirect_append(parser: Parser, line: str, expected_str: str):
     ("'cmd1' | ' cmd2 ' > file2.txt", "cmd1 | ' cmd2 ' > file2.txt"),
     ("cmd1 | > file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 > file2.txt"),
 ))
-def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str):
+def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -397,19 +384,24 @@ def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Forma
             assert second_cmd.redirect_to == File("file2.txt")
             assert isinstance(second_cmd.redirect_to_operator, RedirectionOutput)
 
-    check(line)
-    for pipe_space_count in range(0, 5):
-        pipe_spaces = " " * pipe_space_count
-        for redirect_space_count in range(0, 5):
-            redirect_spaces = " " * redirect_space_count
-            for pipe_chars in ("| ", " |", " | "):
-                _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
-                check(_line)
-                check(_line.replace("> ", redirect_spaces + ">" + redirect_spaces))
-                check(_line.replace(" >", redirect_spaces + ">" + redirect_spaces))
-                check(_line.replace(" > ", redirect_spaces + ">" + redirect_spaces))
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace("> ", redirect_chars))
+    check(_line.replace(" >", redirect_chars))
+    check(_line.replace(" > ", redirect_chars))
 
 
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 arg1 > file1.txt | cmd2 arg1 arg2 > file2.txt", "cmd1 arg1 > file1.txt | cmd2 arg1 arg2 > file2.txt"),
     ("cmd1 'arg1 arg2' > file1.txt | cmd2 arg1 > file2.txt", "cmd1 'arg1 arg2' > file1.txt | cmd2 arg1 > file2.txt"),
@@ -417,7 +409,7 @@ def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Forma
     ("> file1.txt 'cmd1' | ' cmd2 ' > file2.txt", "cmd1 > file1.txt | ' cmd2 ' > file2.txt"),
     ("cmd1 arg1 > file1.txt | > file2.txt cmd2", "cmd1 arg1 > file1.txt | cmd2 > file2.txt"),
 ))
-def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str):
+def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -434,19 +426,24 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
         assert second_cmd.redirect_to == File("file2.txt")
         assert isinstance(second_cmd.redirect_to_operator, RedirectionOutput)
 
-    check(line)
-    for pipe_space_count in range(0, 5):
-        pipe_spaces = " " * pipe_space_count
-        for redirect_space_count in range(0, 5):
-            redirect_spaces = " " * redirect_space_count
-            for pipe_chars in ("| ", " |", " | "):
-                _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
-                check(_line)
-                check(_line.replace("> ", redirect_spaces + ">" + redirect_spaces))
-                check(_line.replace(" >", redirect_spaces + ">" + redirect_spaces))
-                check(_line.replace(" > ", redirect_spaces + ">" + redirect_spaces))
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace("> ", redirect_chars))
+    check(_line.replace(" >", redirect_chars))
+    check(_line.replace(" > ", redirect_chars))
 
 
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 arg1 >> file1.txt | cmd2 arg1 arg2", "cmd1 arg1 >> file1.txt | cmd2 arg1 arg2"),
     ("cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1 ", "cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1"),
@@ -454,7 +451,7 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
     ("'cmd1' | ' cmd2 ' >> file2.txt", "cmd1 | ' cmd2 ' >> file2.txt"),
     ("cmd1 | >> file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 >> file2.txt"),
 ))
-def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str):
+def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -474,19 +471,24 @@ def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Forma
             assert second_cmd.redirect_to == File("file2.txt")
             assert isinstance(second_cmd.redirect_to_operator, RedirectionAppend)
 
-    check(line)
-    for pipe_space_count in range(0, 5):
-        pipe_spaces = " " * pipe_space_count
-        for redirect_space_count in range(0, 5):
-            redirect_spaces = " " * redirect_space_count
-            for pipe_chars in ("| ", " |", " | "):
-                _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
-                check(_line)
-                check(_line.replace(">> ", redirect_spaces + ">>" + redirect_spaces))
-                check(_line.replace(" >>", redirect_spaces + ">>" + redirect_spaces))
-                check(_line.replace(" >> ", redirect_spaces + ">>" + redirect_spaces))
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">>" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace(">> ", redirect_chars))
+    check(_line.replace(" >>", redirect_chars))
+    check(_line.replace(" >> ", redirect_chars))
 
 
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
 @pytest.mark.parametrize("line,expected_str", (
     ("cmd1 arg1 >> file1.txt | cmd2 arg1 arg2 >> file2.txt", "cmd1 arg1 >> file1.txt | cmd2 arg1 arg2 >> file2.txt"),
     ("cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1 >> file2.txt", "cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1 >> file2.txt"),
@@ -494,7 +496,7 @@ def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Forma
     (">> file1.txt 'cmd1' | ' cmd2 ' >> file2.txt", "cmd1 >> file1.txt | ' cmd2 ' >> file2.txt"),
     ("cmd1 arg1 >> file1.txt | >> file2.txt cmd2", "cmd1 arg1 >> file1.txt | cmd2 >> file2.txt"),
 ))
-def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str):
+def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -511,29 +513,31 @@ def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatte
         assert second_cmd.redirect_to == File("file2.txt")
         assert isinstance(second_cmd.redirect_to_operator, RedirectionAppend)
 
-    check(line)
-    for pipe_space_count in range(0, 5):
-        pipe_spaces = " " * pipe_space_count
-        for redirect_space_count in range(0, 5):
-            redirect_spaces = " " * redirect_space_count
-            for pipe_chars in ("| ", " |", " | "):
-                _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
-                check(_line)
-                check(_line.replace(">> ", redirect_spaces + ">>" + redirect_spaces))
-                check(_line.replace(" >>", redirect_spaces + ">>" + redirect_spaces))
-                check(_line.replace(" >> ", redirect_spaces + ">>" + redirect_spaces))
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">>" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace(">> ", redirect_chars))
+    check(_line.replace(" >>", redirect_chars))
+    check(_line.replace(" >> ", redirect_chars))
 
 
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
 @pytest.mark.parametrize("line,expected_cmd_count,expected_str", (
     ("cmd1 arg1 | cmd2 arg1 | cmd3 arg1", 3, "cmd1 arg1 | cmd2 arg1 | cmd3 arg1"),
     ("cmd1 'arg1 arg2' | cmd2 \"arg1 arg2\" arg3", 2, "cmd1 'arg1 arg2' | cmd2 'arg1 arg2' arg3"),
     ("cmd1 'arg1' 'arg2' 'arg3' | cmd2 | cmd3 \"\\arg1'\"", 3, "cmd1 arg1 arg2 arg3 | cmd2 | cmd3 '\\arg1'\"'\"''"),
     ("cmd1 | cmd2 | cmd3 | cmd4 | cmd5", 5, "cmd1 | cmd2 | cmd3 | cmd4 | cmd5"),
 ))
-def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expected_cmd_count: int, expected_str: str):
+def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expected_cmd_count: int, expected_str: str, pipe_space_count: int):
     def check(_line):
         first_cmd = parser.parse(_line)
-        assert_no_redirections(first_cmd)
         assert first_cmd.next_command is None
         assert first_cmd.next_command_operator is None
 
@@ -541,7 +545,6 @@ def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expecte
         cur_cmd = first_cmd.pipe_command
         while cur_cmd:
             actual_cmd_count += 1
-            assert_no_redirections(cur_cmd)
             assert cur_cmd.next_command is None
             assert cur_cmd.next_command_operator is None
             cur_cmd = cur_cmd.pipe_command
@@ -551,12 +554,15 @@ def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expecte
         actual_str = formatter.format_statement(first_cmd)
         assert actual_str == expected_str
 
-    check(line)
-    for pipe_space_count in range(0, 5):
-        pipe_spaces = " " * pipe_space_count
-        check(line.replace("| ", pipe_spaces + "|" + pipe_spaces))
-        check(line.replace(" |", pipe_spaces + "|" + pipe_spaces))
-        check(line.replace(" | ", pipe_spaces + "|" + pipe_spaces))
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    pipe_space_chars = pipe_spaces + "|" + pipe_spaces
+    check(line.replace("| ", pipe_space_chars))
+    check(line.replace(" |", pipe_space_chars))
+    check(line.replace(" | ", pipe_space_chars))
 
 
 @pytest.mark.parametrize("line,expected_stmt_count,expected_cmd_count", (
@@ -570,19 +576,16 @@ def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expecte
 def test_multiple_statements_with_pipes(parser: Parser, line: str, expected_stmt_count: int, expected_cmd_count: int):
     def check(_line: str):
         first_cmd = parser.parse(_line)
-        assert_no_redirections(first_cmd)
         stmt_count = 0
         cmd_count = 0
         cur_cmd = first_cmd
         cur_pipe_cmd = first_cmd
         while cur_cmd:
-            assert_no_redirections(cur_cmd)
             assert cur_cmd.next_command_operator is None
             stmt_count += 1
             cmd_count += 1
             cur_pipe_cmd = cur_cmd.pipe_command
             while cur_pipe_cmd:
-                assert_no_redirections(cur_pipe_cmd)
                 assert cur_pipe_cmd.next_command is None
                 assert cur_pipe_cmd.next_command_operator is None
                 cmd_count += 1

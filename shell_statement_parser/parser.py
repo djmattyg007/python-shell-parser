@@ -1,8 +1,30 @@
-import sys
+import os
+from typing import Optional
+
 from .ast import *
 
 
-WHITESPACE = (" ", "\t")
+WHITESPACE = frozenset((" ", "\t"))
+NUMBERS = frozenset((str(x) for x in range(0, 10)))
+
+
+mydebug = None
+def breaker():
+    global mydebug
+    return
+    if mydebug is None:
+        import pdb
+        mydebug = pdb.Pdb()
+        mydebug.rcLines = ['alias stats pp dict(((x, y) for x, y in locals().items() if not isinstance(y, CommandBuilder) and x != "self" and not callable(y)))']
+    if os.environ.get("PYTHONBREAKPOINT", "") != "0":
+        mydebug.set_trace()
+
+
+def isdigit(s: str) -> bool:
+    for char in s:
+        if char not in NUMBERS:
+            return False
+    return True
 
 
 class Parser(object):
@@ -14,7 +36,6 @@ class Parser(object):
 
         pos = 0
         cur_word = ""
-        cur_command_words = []
 
         cmd_builder = CommandBuilder()
         first_cmd_builder: CommandBuilder = cmd_builder
@@ -22,60 +43,83 @@ class Parser(object):
         pipe_first_cmd_builder: CommandBuilder = cmd_builder
         pipe_prev_cmd_builder: CommandBuilder = None
 
-        commands = []
-
-        prev_char = None
-        quote_mode = None
+        prev_char: str = None
+        quote_mode: str = None
         was_quote_mode = False
-        redirect_mode = None
+        redirect_mode: str = None
         just_terminated = False
         expecting_new_statement = False
+        current_descriptor: int = None
+        modifying_descriptor = False
 
         def WRITE_CHAR(char: str):
             nonlocal cur_word
             cur_word += char
 
-        def NEXT_CHAR() -> str:
+        def NEXT_CHAR(*, fail_if_end: bool = True) -> Optional[str]:
             try:
                 next_char = statement[pos + 1]
             except IndexError:
                 next_char = None
 
-            if next_char is None:
+            if next_char is None and fail_if_end:
                 raise UnexpectedStatementFinishParserFailure("Unexpected end of statement while parsing.", pos=pos)
             else:
                 return next_char
 
         def END_WORD():
-            nonlocal cur_word, was_quote_mode, cur_command_words, cmd_builder, redirect_mode
+            nonlocal cur_word, was_quote_mode, cmd_builder, redirect_mode, current_descriptor, modifying_descriptor
+            breaker()
             if redirect_mode:
                 if not cur_word:
                     raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
                 cmd_builder.redirect_to = File(cur_word)
-                if redirect_mode == ">":
-                    cmd_builder.redirect_to_operator = RedirectionOutput()
+                if redirect_mode == "<":
+                    descriptor_mode = DescriptorRead()
+                    redirect_operator = RedirectionInput()
+                elif redirect_mode == ">":
+                    descriptor_mode = DescriptorWrite()
+                    redirect_operator = RedirectionOutput()
                 elif redirect_mode == ">>":
-                    cmd_builder.redirect_to_operator = RedirectionAppend()
-                cur_command_words.append(cur_word)
+                    descriptor_mode = DescriptorWrite()
+                    redirect_operator = RedirectionAppend()
+                cmd_builder.redirect_to_operator = redirect_operator
+                if modifying_descriptor:
+                    if cur_word == "-":
+                        cmd_builder.descriptors.close_descriptor(current_descriptor)
+                    elif isdigit(cur_word):
+                        cmd_builder.descriptors.duplicate_descriptor(int(cur_word), current_descriptor)
+                    else:
+                        raise AmbiguousRedirectParserFailure("", pos=pos)
+                else:
+                    descriptor = CommandDescriptor(
+                        mode=descriptor_mode,
+                        descriptor=CommandFileDescriptor(
+                            target=File(cur_word),
+                            operator=redirect_operator,
+                        )
+                    )
+                    cmd_builder.descriptors.set_descriptor(current_descriptor, descriptor)
+
                 cur_word = ""
                 redirect_mode = False
+                current_descriptor = None
+                modifying_descriptor = False
             else:
                 if cur_word or was_quote_mode:
                     if was_quote_mode:
                         cmd_builder.words.append(QuotedWord(cur_word))
                     else:
                         cmd_builder.words.append(Word(cur_word))
-                    cur_command_words.append(cur_word)
                     cur_word = ""
 
         def END_CMDARGS():
-            nonlocal cur_command_words, commands, was_quote_mode
-            commands.append(tuple(cur_command_words))
-            cur_command_words = []
+            nonlocal was_quote_mode
             was_quote_mode = False
 
         def END_STMT():
             nonlocal cmd_builder, prev_cmd_builder, pipe_first_cmd_builder, pipe_prev_cmd_builder
+            breaker()
             if pipe_prev_cmd_builder:
                 pipe_prev_cmd_builder.pipe_command = cmd_builder
                 if prev_cmd_builder:
@@ -91,9 +135,8 @@ class Parser(object):
             pipe_prev_cmd_builder = None
 
 
-        #import pdb; pdb.set_trace()
-        #breakpoint()
         while pos < statement_len:
+            breaker()
             char = statement[pos]
             if just_terminated and char not in WHITESPACE:
                 just_terminated = False
@@ -158,15 +201,22 @@ class Parser(object):
 
                     END_WORD()
 
+                    if current_descriptor is None:
+                        current_descriptor = 1
+
                     next_char = NEXT_CHAR()
                     if next_char == ">":
                         redirect_mode = ">>"
-                        cur_command_words.append(">>")
                         pos += 1
                         next_char = NEXT_CHAR()
+                        if next_char == "&":
+                            raise InvalidRedirectionParserFailure("Cannot duplicate descriptor with append operator.", pos=pos)
                     else:
                         redirect_mode = ">"
-                        cur_command_words.append(">")
+                        if next_char == "&":
+                            modifying_descriptor = True
+                            pos += 1
+                            next_char = NEXT_CHAR()
 
                     while next_char in WHITESPACE:
                         pos += 1
@@ -214,6 +264,39 @@ class Parser(object):
                         pipe_prev_cmd_builder = cmd_builder
                         cmd_builder = CommandBuilder()
 
+            elif char == "-":
+                if prev_char == "\\":
+                    WRITE_CHAR(char)
+                elif modifying_descriptor and not cur_word:
+                    WRITE_CHAR(char)
+                    END_WORD()
+                else:
+                    WRITE_CHAR(char)
+
+            elif char in NUMBERS:
+                if prev_char == "\\":
+                    WRITE_CHAR(char)
+                elif not cur_word and not redirect_mode:
+                    possible_descriptor = char
+                    next_char = NEXT_CHAR(fail_if_end=False)
+                    pos += 1
+                    while True:
+                        if next_char == ">":
+                            current_descriptor = int(possible_descriptor)
+                            break
+                        elif next_char in NUMBERS:
+                            possible_descriptor += next_char
+                        elif next_char:
+                            WRITE_CHAR(possible_descriptor)
+                            break
+                        else:
+                            break
+                        next_char = NEXT_CHAR(fail_if_end=False)
+                        pos += 1
+                    continue
+                else:
+                    WRITE_CHAR(char)
+
             elif char in WHITESPACE:
                 if prev_char == "\\":
                     WRITE_CHAR(char)
@@ -238,10 +321,7 @@ class Parser(object):
             END_CMDARGS()
             END_STMT()
 
-        if "pytest" in sys.modules:
-            return first_cmd_builder.create()
-        else:
-            return tuple(commands), first_cmd_builder.create()
+        return first_cmd_builder.create()
 
 
 class EmptyInputException(Exception):
@@ -270,6 +350,14 @@ class UnexpectedStatementFinishParserFailure(ParserFailure):
     pass
 
 
+class InvalidRedirectionParserFailure(ParserFailure):
+    pass
+
+
+class AmbiguousRedirectParserFailure(ParserFailure):
+    pass
+
+
 __all__ = [
     "Parser",
     "EmptyInputException",
@@ -278,4 +366,6 @@ __all__ = [
     "EmptyStatementParserFailure",
     "EmptyRedirectParserFailure",
     "UnexpectedStatementFinishParserFailure",
+    "InvalidRedirectionParserFailure",
+    "AmbiguousRedirectParserFailure",
 ]

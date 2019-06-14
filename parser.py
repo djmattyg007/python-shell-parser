@@ -1,53 +1,47 @@
-from shell_statement_parser.parser import Parser
+import bdb
+import importlib
+import sys
+
+import shell_statement_parser.ast as ast
+import shell_statement_parser.parser as parser
+import shell_statement_parser.formatter as formatter
 
 try:
     import readline
 except:
     pass
 
+while True:
+    try:
+        statement = input("> ")
+    except (EOFError, KeyboardInterrupt):
+        sys.stdout.write("\n")
+        break
+    statement = statement.strip()
+    if statement == "q":
+        break
 
-statement = input("> ")
-print(repr(statement))
+    importlib.reload(ast)
+    importlib.reload(parser)
+    importlib.reload(formatter)
 
-parser = Parser()
-commands, first_cmd = parser.parse(statement)
-print(commands)
-print("")
+    p = parser.Parser()
+    try:
+        first_cmd = p.parse(statement)
+    except bdb.BdbQuit:
+        sys.stderr.write("\n")
+        continue
+    except parser.ParserFailure as e:
+        sys.stderr.write("Parser failure at position {0}\n".format(e.pos))
+        sys.stderr.write(statement + "\n")
+        sys.stderr.write((" " * e.pos) + "^\n")
+        sys.stderr.write("{0}: {1}\n\n".format(e.__class__.__name__, e))
+        continue
+    print("")
 
-for i, command in enumerate(commands):
-    print("cmd", i)
-    for word in command:
-        print(" ", word)
-print("")
+    f = formatter.Formatter()
+    formatted_statements = f.format_statements(first_cmd)
+    for stmt in formatted_statements:
+        print(stmt)
 
-
-def output_statement(cmd):
-    statement = str(cmd)
-    cur_pipe_cmd = cmd.pipe_command
-    while cur_pipe_cmd:
-        statement += " | " + str(cur_pipe_cmd)
-        cur_pipe_cmd = cur_pipe_cmd.pipe_command
-    return statement
-
-def output_statements(first_cmd):
-    statements = []
-    cmd = first_cmd
-    while cmd:
-        if cmd.next_command_operator:
-            cur_cmd = cmd
-            statement = ""
-            while cur_cmd.next_command_operator:
-                statement += output_statement(cur_cmd)
-                statement += " " + str(cur_cmd.next_command_operator) + " "
-                cur_cmd = cur_cmd.next_command
-            statement += output_statement(cur_cmd)
-            cmd = cur_cmd.next_command
-        else:
-            statement = output_statement(cmd)
-            cmd = cmd.next_command
-
-        statements.append(statement)
-    return statements
-
-for statement in output_statements(first_cmd):
-    print(statement)
+    print("")
