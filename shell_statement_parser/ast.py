@@ -189,6 +189,16 @@ class CommandDescriptor(object):
     mode: Union[DescriptorRead, DescriptorWrite]
     descriptor: CommandFileDescriptor
 
+    def __post_init__(self):
+        if isinstance(self.mode, DescriptorRead):
+            if not isinstance(self.descriptor.operator, RedirectionInput):
+                raise Exception()
+        elif isinstance(self.mode, DescriptorWrite):
+            if not isinstance(self.descriptor.operator, (RedirectionOutput, RedirectionAppend)):
+                raise Exception()
+        else:
+            raise Exception()
+
     def duplicate(self) -> 'CommandDescriptor':
         return CommandDescriptor(
             mode=self.mode,
@@ -261,18 +271,12 @@ class Command(object):
     command: Word
     descriptors: CommandDescriptors
     args: Collection[Word] = field(default_factory=tuple)
-    redirect_to: Optional[File] = None
-    redirect_to_operator: Optional[Union[RedirectionOutput, RedirectionAppend]] = None
     pipe_command: Optional[COMMAND_TYPE] = None
     next_command: Optional[COMMAND_TYPE] = None
     next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
     asynchronous: bool = False
 
     def __post_init__(self):
-        if self.redirect_to and not self.redirect_to_operator:
-            raise InvalidCommandDataException("Redirection file set, but no redirection operator set.")
-        if not self.redirect_to and self.redirect_to_operator:
-            raise InvalidCommandDataException("Redirection operator set, but no redirection file set.")
         if self.next_command_operator and not self.next_command:
             raise InvalidCommandDataException("Next command operator set, but no next command set.")
 
@@ -367,8 +371,6 @@ class InvalidFileDescriptorException(Exception):
 class CommandBuilder(object):
     words: List[Word] = field(default_factory=list)
     descriptors: CommandDescriptorsBuilder = field(default_factory=CommandDescriptorsBuilder)
-    redirect_to: Optional[File] = None
-    redirect_to_operator: Optional[Union[RedirectionOutput, RedirectionAppend]] = None
     pipe_command: Optional[COMMANDBUILDER_TYPE] = None
     next_command: Optional[COMMANDBUILDER_TYPE] = None
     next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
@@ -399,8 +401,6 @@ class CommandBuilder(object):
             args=args,
             descriptors=self.descriptors.create(),
             pipe_command=pipe_command,
-            redirect_to=self.redirect_to,
-            redirect_to_operator=self.redirect_to_operator,
             next_command=next_command,
             next_command_operator=self.next_command_operator,
             asynchronous=self.asynchronous,
@@ -411,8 +411,6 @@ class CommandBuilder(object):
 class NestedCommandList(object):
     first_command: COMMAND_TYPE
     pipe_command: Optional[COMMAND_TYPE] = None
-    redirect_to: Optional[str] = None
-    redirect_to_operator: Optional[Union[RedirectionOutput, RedirectionAppend]] = None
     next_command: Optional[COMMAND_TYPE] = None
     next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
     asynchronous: bool = False
@@ -424,6 +422,9 @@ class CommandBuilderCreateException(Exception):
 
 __all__ = [
     "COMMAND_TYPE",
+    "DESCRIPTOR_DEFAULT_INDEX_STDIN",
+    "DESCRIPTOR_DEFAULT_INDEX_STDOUT",
+    "DESCRIPTOR_DEFAULT_INDEX_STDERR",
     "Word",
     "QuotedWord",
     "File",

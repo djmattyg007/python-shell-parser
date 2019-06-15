@@ -73,7 +73,6 @@ class Parser(object):
             if redirect_mode:
                 if not cur_word:
                     raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
-                cmd_builder.redirect_to = File(cur_word)
                 if redirect_mode == "<":
                     descriptor_mode = DescriptorRead()
                     redirect_operator = RedirectionInput()
@@ -83,7 +82,6 @@ class Parser(object):
                 elif redirect_mode == ">>":
                     descriptor_mode = DescriptorWrite()
                     redirect_operator = RedirectionAppend()
-                cmd_builder.redirect_to_operator = redirect_operator
                 if modifying_descriptor:
                     if cur_word == "-":
                         cmd_builder.descriptors.close_descriptor(current_descriptor)

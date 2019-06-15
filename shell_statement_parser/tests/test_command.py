@@ -14,16 +14,6 @@ def test_missing_compulsory_data():
         Command(command=Word("cmd"))
 
 
-def test_invalid_redirect_data():
-    with pytest.raises(InvalidCommandDataException, match=re.escape("Redirection file set, but no redirection operator set.")):
-        Command(command=Word("cmd1"), descriptors={}, redirect_to=File("file1.txt"))
-
-    with pytest.raises(InvalidCommandDataException, match=re.escape("Redirection operator set, but no redirection file set.")):
-        Command(command=Word("cmd2"), descriptors={}, redirect_to_operator=RedirectionOutput())
-    with pytest.raises(InvalidCommandDataException, match="Redirection operator set, but no redirection file set."):
-        Command(command=Word("cmd3"), descriptors={}, redirect_to_operator=RedirectionAppend())
-
-
 def test_invalid_next_command_data():
     with pytest.raises(InvalidCommandDataException, match=re.escape("Next command operator set, but no next command set.")):
         Command(command=Word("cmd1"), descriptors={}, next_command_operator=OperatorAnd())
@@ -39,10 +29,6 @@ def test_immutability():
         cmd.descriptors = {}
     with pytest.raises(dataclasses.FrozenInstanceError):
         cmd.args = tuple("arg1")
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        cmd.redirect_to = File("file1.txt")
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        cmd.redirect_to_operator = None
     with pytest.raises(dataclasses.FrozenInstanceError):
         cmd.pipe_command = None
     with pytest.raises(dataclasses.FrozenInstanceError):

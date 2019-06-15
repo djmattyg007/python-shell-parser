@@ -6,7 +6,7 @@ import re
 from shell_statement_parser.ast import *
 from shell_statement_parser.formatter import Formatter
 from shell_statement_parser.parser import *
-from typing import Tuple
+from typing import Mapping, Set, Tuple, Union
 
 
 # TODO: check for removal
@@ -20,6 +20,53 @@ def assert_single_cmd(cmd: Command):
     assert cmd.pipe_command is None
     assert cmd.next_command is None
     assert cmd.next_command_operator is None
+
+
+def make_descriptor(target: File, operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]) -> CommandDescriptor:
+    file_descriptor = CommandFileDescriptor(
+        target=target,
+        operator=operator,
+    )
+    if isinstance(operator, RedirectionInput):
+        return CommandDescriptor(
+            mode=DescriptorRead(),
+            descriptor=file_descriptor,
+        )
+    else:
+        return CommandDescriptor(
+            mode=DescriptorWrite(),
+            descriptor=file_descriptor,
+        )
+
+
+def assert_descriptors(
+        cmd: Command,
+        *,
+        defaults: Set[int] = frozenset((0, 1, 2)),
+        files: Mapping[int, CommandDescriptor] = None,
+        closed: Set[int] = frozenset()
+    ):
+    descriptors = cmd.descriptors.descriptors
+    checked_fds = set()
+
+    not_set_defaults = defaults - closed
+    if files is not None:
+        not_set_defaults -= files.keys()
+
+    for default_fd in not_set_defaults:
+        assert descriptors[default_fd].descriptor.is_default_file == True
+        checked_fds.add(default_fd)
+
+    if files is not None:
+        for file_fd, descriptor in files.items():
+            assert descriptors[file_fd] == descriptor
+            checked_fds.add(file_fd)
+
+    for closed_fd in closed:
+        assert isinstance(descriptors[closed_fd], CommandDescriptorClosed)
+        checked_fds.add(closed_fd)
+
+    assert checked_fds == descriptors.keys()
 
 
 @pytest.fixture(scope="module")
@@ -242,12 +289,14 @@ def test_empty_string_args(parser: Parser, line: str):
 def test_multiple_plain_commands(parser: Parser, line: str, expected_cmd_count: int):
     first_cmd = parser.parse(line)
     assert first_cmd.next_command_operator is None
+    assert_descriptors(first_cmd)
 
     actual_cmd_count = 1
     cur_cmd = first_cmd.next_command
     while cur_cmd:
         actual_cmd_count += 1
         assert cur_cmd.next_command_operator is None
+        assert_descriptors(cur_cmd)
 
         cur_cmd = cur_cmd.next_command
 
@@ -268,6 +317,7 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     first_cmd = parser.parse(line)
     assert first_cmd.next_command is None
     assert first_cmd.next_command_operator is None
+    assert_descriptors(first_cmd)
 
     actual_cmd_count = 1
     cur_cmd = first_cmd.pipe_command
@@ -275,6 +325,7 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
         actual_cmd_count += 1
         assert cur_cmd.next_command is None
         assert cur_cmd.next_command_operator is None
+        assert_descriptors(cur_cmd)
 
         cur_cmd = cur_cmd.pipe_command
 
@@ -299,14 +350,14 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
 ))
 def test_redirect_output(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped appends
+    file_descriptor = make_descriptor(File("testfile.txt"), RedirectionOutput())
     def check(_line: str):
         first_cmd = parser.parse(_line)
         assert_single_cmd(first_cmd)
 
         assert str(first_cmd.command) == "cmd1"
         assert str(first_cmd) == expected_str
-        assert first_cmd.redirect_to == File("testfile.txt")
-        assert isinstance(first_cmd.redirect_to_operator, RedirectionOutput)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
     if space_count < 0:
         check(line)
@@ -335,14 +386,14 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str, space_cou
 ))
 def test_redirect_append(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped outputs 
+    file_descriptor = make_descriptor(File("testfile.txt"), RedirectionAppend())
     def check(_line: str):
         first_cmd = parser.parse(line)
         assert_single_cmd(first_cmd)
 
         assert str(first_cmd.command) == "cmd1"
         assert str(first_cmd) == expected_str
-        assert first_cmd.redirect_to == File("testfile.txt")
-        assert isinstance(first_cmd.redirect_to_operator, RedirectionAppend)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
     if space_count < 0:
         check(line)
@@ -361,10 +412,9 @@ def test_redirect_append(parser: Parser, line: str, expected_str: str, space_cou
     ("cmd1 arg1 > file1.txt | cmd2 arg1 arg2", "cmd1 arg1 > file1.txt | cmd2 arg1 arg2"),
     ("cmd1 'arg1 arg2' > file1.txt | cmd2 arg1 ", "cmd1 'arg1 arg2' > file1.txt | cmd2 arg1"),
     ("> file1.txt cmd1 | cmd2  \"arg1 arg2 \"", "cmd1 > file1.txt | cmd2 'arg1 arg2 '"),
-    ("'cmd1' | ' cmd2 ' > file2.txt", "cmd1 | ' cmd2 ' > file2.txt"),
-    ("cmd1 | > file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 > file2.txt"),
 ))
-def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+def test_pipe_and_redirect_output_left_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file_descriptor = make_descriptor(File("file1.txt"), RedirectionOutput())
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -373,16 +423,51 @@ def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Forma
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd)
 
-        if first_cmd.redirect_to_operator:
-            assert first_cmd.redirect_to == File("file1.txt")
-            assert isinstance(first_cmd.redirect_to_operator, RedirectionOutput)
-        else:
-            assert second_cmd.redirect_to == File("file2.txt")
-            assert isinstance(second_cmd.redirect_to_operator, RedirectionOutput)
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace("> ", redirect_chars))
+    check(_line.replace(" >", redirect_chars))
+    check(_line.replace(" > ", redirect_chars))
+
+
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
+@pytest.mark.parametrize("line,expected_str", (
+    ("'cmd1' | ' cmd2 ' > file2.txt", "cmd1 | ' cmd2 ' > file2.txt"),
+    ("cmd1 | > file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 > file2.txt"),
+))
+def test_pipe_and_redirect_output_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file_descriptor = make_descriptor(File("file2.txt"), RedirectionOutput())
+    def check(_line):
+        first_cmd = parser.parse(_line)
+        assert first_cmd.next_command is None
+        assert first_cmd.next_command_operator is None
+        assert formatter.format_statement(first_cmd) == expected_str
+
+        assert str(first_cmd.command) == "cmd1"
+        assert isinstance(first_cmd.pipe_command, Command)
+        assert_descriptors(first_cmd)
+
+        second_cmd = first_cmd.pipe_command
+        assert str(second_cmd.command).strip() == "cmd2"
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -410,6 +495,8 @@ def test_pipe_and_redirect_output_one_side_only(parser: Parser, formatter: Forma
     ("cmd1 arg1 > file1.txt | > file2.txt cmd2", "cmd1 arg1 > file1.txt | cmd2 > file2.txt"),
 ))
 def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file1_descriptor = make_descriptor(File("file1.txt"), RedirectionOutput())
+    file2_descriptor = make_descriptor(File("file2.txt"), RedirectionOutput())
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -418,13 +505,12 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert first_cmd.redirect_to == File("file1.txt")
-        assert isinstance(first_cmd.redirect_to_operator, RedirectionOutput)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file1_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
-        assert second_cmd.redirect_to == File("file2.txt")
-        assert isinstance(second_cmd.redirect_to_operator, RedirectionOutput)
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file2_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -448,10 +534,9 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
     ("cmd1 arg1 >> file1.txt | cmd2 arg1 arg2", "cmd1 arg1 >> file1.txt | cmd2 arg1 arg2"),
     ("cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1 ", "cmd1 'arg1 arg2' >> file1.txt | cmd2 arg1"),
     (">> file1.txt cmd1 | cmd2  \"arg1 arg2 \"", "cmd1 >> file1.txt | cmd2 'arg1 arg2 '"),
-    ("'cmd1' | ' cmd2 ' >> file2.txt", "cmd1 | ' cmd2 ' >> file2.txt"),
-    ("cmd1 | >> file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 >> file2.txt"),
 ))
-def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+def test_pipe_and_redirect_append_left_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file_descriptor = make_descriptor(File("file1.txt"), RedirectionAppend())
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -460,16 +545,51 @@ def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Forma
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd)
 
-        if first_cmd.redirect_to_operator:
-            assert first_cmd.redirect_to == File("file1.txt")
-            assert isinstance(first_cmd.redirect_to_operator, RedirectionAppend)
-        else:
-            assert second_cmd.redirect_to == File("file2.txt")
-            assert isinstance(second_cmd.redirect_to_operator, RedirectionAppend)
+    if pipe_space_count < 0:
+        check(line)
+        return
+
+    pipe_spaces = " " * pipe_space_count
+    redirect_spaces = " " * redirect_space_count
+    redirect_chars = redirect_spaces + ">>" + redirect_spaces
+
+    _line = line.replace(pipe_chars, pipe_spaces + "|" + pipe_spaces)
+    check(_line)
+    check(_line.replace(">> ", redirect_chars))
+    check(_line.replace(" >>", redirect_chars))
+    check(_line.replace(" >> ", redirect_chars))
+
+
+@pytest.mark.parametrize("pipe_space_count", range(-1, 4))
+@pytest.mark.parametrize("redirect_space_count", range(0, 4))
+@pytest.mark.parametrize("pipe_chars", ("| ", " |", " | "))
+@pytest.mark.parametrize("line,expected_str", (
+    ("'cmd1' | ' cmd2 ' >> file2.txt", "cmd1 | ' cmd2 ' >> file2.txt"),
+    ("cmd1 | >> file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 >> file2.txt"),
+))
+def test_pipe_and_redirect_append_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file_descriptor = make_descriptor(File("file2.txt"), RedirectionAppend())
+    def check(_line):
+        first_cmd = parser.parse(_line)
+        assert first_cmd.next_command is None
+        assert first_cmd.next_command_operator is None
+        assert formatter.format_statement(first_cmd) == expected_str
+
+        assert str(first_cmd.command) == "cmd1"
+        assert isinstance(first_cmd.pipe_command, Command)
+        assert_descriptors(first_cmd)
+
+        second_cmd = first_cmd.pipe_command
+        assert str(second_cmd.command).strip() == "cmd2"
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -497,6 +617,8 @@ def test_pipe_and_redirect_append_one_side_only(parser: Parser, formatter: Forma
     ("cmd1 arg1 >> file1.txt | >> file2.txt cmd2", "cmd1 arg1 >> file1.txt | cmd2 >> file2.txt"),
 ))
 def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
+    file1_descriptor = make_descriptor(File("file1.txt"), RedirectionAppend())
+    file2_descriptor = make_descriptor(File("file2.txt"), RedirectionAppend())
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -505,13 +627,12 @@ def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatte
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert first_cmd.redirect_to == File("file1.txt")
-        assert isinstance(first_cmd.redirect_to_operator, RedirectionAppend)
+        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file1_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
-        assert second_cmd.redirect_to == File("file2.txt")
-        assert isinstance(second_cmd.redirect_to_operator, RedirectionAppend)
+        assert_single_cmd(second_cmd)
+        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file2_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -540,6 +661,7 @@ def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expecte
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
         assert first_cmd.next_command_operator is None
+        assert_descriptors(first_cmd)
 
         actual_cmd_count = 1
         cur_cmd = first_cmd.pipe_command
@@ -547,6 +669,7 @@ def test_multiple_pipes(parser: Parser, formatter: Formatter, line: str, expecte
             actual_cmd_count += 1
             assert cur_cmd.next_command is None
             assert cur_cmd.next_command_operator is None
+            assert_descriptors(cur_cmd)
             cur_cmd = cur_cmd.pipe_command
 
         assert actual_cmd_count == expected_cmd_count
@@ -582,12 +705,14 @@ def test_multiple_statements_with_pipes(parser: Parser, line: str, expected_stmt
         cur_pipe_cmd = first_cmd
         while cur_cmd:
             assert cur_cmd.next_command_operator is None
+            assert_descriptors(cur_cmd)
             stmt_count += 1
             cmd_count += 1
             cur_pipe_cmd = cur_cmd.pipe_command
             while cur_pipe_cmd:
                 assert cur_pipe_cmd.next_command is None
                 assert cur_pipe_cmd.next_command_operator is None
+                assert_descriptors(cur_pipe_cmd)
                 cmd_count += 1
                 cur_pipe_cmd = cur_pipe_cmd.pipe_command
             cur_cmd = cur_cmd.next_command
@@ -675,12 +800,14 @@ def test_ored_statements(parser: Parser, formatter: Formatter, line: str, expect
 ))
 def test_mixed_next_cmd_operators(parser: Parser, formatter: Formatter, line: str, expected_cmd_count: int):
     first_cmd = parser.parse(line)
+    assert_descriptors(first_cmd)
     formatted_statements = formatter.format_statements(first_cmd)
     assert "; ".join(formatted_statements) == line
 
     cur_cmd = first_cmd.next_command
     cmd_count = 1
     while cur_cmd:
+        assert_descriptors(cur_cmd)
         cur_cmd = cur_cmd.next_command
         cmd_count += 1
     assert cmd_count == expected_cmd_count
