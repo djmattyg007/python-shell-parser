@@ -2,7 +2,7 @@ import pytest
 
 import re
 
-from shell_statement_parser.ast import CommandBuilder, CommandBuilderCreateException
+from shell_parser.ast import CommandBuilder, CommandBuilderCreateException
 
 
 def test_no_words():

@@ -3,7 +3,7 @@ import pytest
 import dataclasses
 import re
 
-from shell_statement_parser.ast import Command, InvalidCommandDataException, Word, File, RedirectionOutput, RedirectionAppend, OperatorAnd, OperatorOr
+from shell_parser.ast import Command, InvalidCommandDataException, Word, File, RedirectionOutput, RedirectionAppend, OperatorAnd, OperatorOr
 
 
 def test_missing_compulsory_data():

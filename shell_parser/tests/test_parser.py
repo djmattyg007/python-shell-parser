@@ -3,17 +3,10 @@ import pytest
 import dataclasses
 import re
 
-from shell_statement_parser.ast import *
-from shell_statement_parser.formatter import Formatter
-from shell_statement_parser.parser import *
+from shell_parser.ast import *
+from shell_parser.formatter import Formatter
+from shell_parser.parser import *
 from typing import Mapping, Set, Tuple, Union
-
-
-# TODO: check for removal
-def strip_quotes(arg: str) -> str:
-    if len(arg) > 1 and arg[0] == arg[-1] and arg[0] in ("'", '"'):
-        arg = arg[1:-1]
-    return arg
 
 
 def assert_single_cmd(cmd: Command):
