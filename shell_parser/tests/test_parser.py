@@ -100,19 +100,19 @@ def test_only_whitespace(parser: Parser, line: str):
 
 @pytest.mark.parametrize("line,expected_str", (
     ("plainword", Word("plainword")),
-    ("'one word'", QuotedWord("one word")),
-    ('"one word"', QuotedWord("one word")),
-    ("' one word '", QuotedWord(" one word ")),
-    ('" one word "', QuotedWord(" one word ")),
+    ("'one word'", Word("one word")),
+    ('"one word"', Word("one word")),
+    ("' one word '", Word(" one word ")),
+    ('" one word "', Word(" one word ")),
     (" plainword ", Word("plainword")),
-    (" 'one word' ", QuotedWord("one word")),
-    (' " one word " ', QuotedWord(" one word ")),
+    (" 'one word' ", Word("one word")),
+    (' " one word " ', Word(" one word ")),
     (r"plain\word", Word("plainword")),
     (r"plain\ word", Word("plain word")),
-    (r"'one\word'", QuotedWord(r"one\word")),
-    (r'"one\word"', QuotedWord(r"one\word")),
-    (r"'one\ word'", QuotedWord(r"one\ word")),
-    (r'"one\ word"', QuotedWord(r"one\ word")),
+    (r"'one\word'", Word(r"one\word")),
+    (r'"one\word"', Word(r"one\word")),
+    (r"'one\ word'", Word(r"one\ word")),
+    (r'"one\ word"', Word(r"one\ word")),
 ))
 def test_single_word(parser: Parser, line: str, expected_str: Word):
     first_cmd = parser.parse(line)
@@ -153,10 +153,10 @@ def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual:
     ("cmd arg1", Word("cmd"), (Word("arg1"),)),
     ("cmd arg1 arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
     ("cmd arg1 arg2 arg3", Word("cmd"), (Word("arg1"), Word("arg2"), Word("arg3"))),
-    ("'cmd' 'arg1 arg2' arg3", QuotedWord("cmd"), (QuotedWord("arg1 arg2"), Word("arg3"))),
-    ('"cmd" "arg1" "arg2 arg3"', QuotedWord("cmd"), (QuotedWord("arg1"), QuotedWord("arg2 arg3"))),
+    ("'cmd' 'arg1 arg2' arg3", Word("cmd"), (Word("arg1 arg2"), Word("arg3"))),
+    ('"cmd" "arg1" "arg2 arg3"', Word("cmd"), (Word("arg1"), Word("arg2 arg3"))),
     ("cmd  arg1   arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
-    ("'cmd'   arg1  '   arg2'", QuotedWord("cmd"), (Word("arg1"), QuotedWord("   arg2"))),
+    ("'cmd'   arg1  '   arg2'", Word("cmd"), (Word("arg1"), Word("   arg2"))),
     ("cmd 1arg 2arg", Word("cmd"), (Word("1arg"), Word("2arg"))),
 ))
 def test_multiple_words(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):

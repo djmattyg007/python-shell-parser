@@ -27,11 +27,6 @@ class Word(object):
 
 
 @dataclass(frozen=True)
-class QuotedWord(Word):
-    pass
-
-
-@dataclass(frozen=True)
 class File(object):
     name: str
 
@@ -428,7 +423,6 @@ __all__ = [
     "DESCRIPTOR_DEFAULT_INDEX_STDOUT",
     "DESCRIPTOR_DEFAULT_INDEX_STDERR",
     "Word",
-    "QuotedWord",
     "File",
     "StdinTarget",
     "StdoutTarget",

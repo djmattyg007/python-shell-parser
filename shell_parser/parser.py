@@ -105,10 +105,7 @@ class Parser(object):
                 modifying_descriptor = False
             else:
                 if cur_word or was_quote_mode:
-                    if was_quote_mode:
-                        cmd_builder.words.append(QuotedWord(cur_word))
-                    else:
-                        cmd_builder.words.append(Word(cur_word))
+                    cmd_builder.words.append(Word(cur_word))
                     cur_word = ""
 
         def END_CMDARGS():
