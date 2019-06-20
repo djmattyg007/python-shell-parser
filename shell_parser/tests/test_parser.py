@@ -15,7 +15,7 @@ def assert_single_cmd(cmd: Command):
     assert cmd.next_command_operator is None
 
 
-def make_descriptor(target: File, operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]) -> CommandDescriptor:
+def make_descriptor(target: Union[File, DefaultFile], operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]) -> CommandDescriptor:
     file_descriptor = CommandFileDescriptor(
         target=target,
         operator=operator,
@@ -30,6 +30,11 @@ def make_descriptor(target: File, operator: Union[RedirectionInput, RedirectionO
             mode=DescriptorWrite(),
             descriptor=file_descriptor,
         )
+
+
+DEFAULT_DESCRIPTOR_STDIN = make_descriptor(DefaultFile(target=StdinTarget()), operator=RedirectionInput())
+DEFAULT_DESCRIPTOR_STDOUT = make_descriptor(DefaultFile(target=StdoutTarget()), operator=RedirectionOutput())
+DEFAULT_DESCRIPTOR_STDERR = make_descriptor(DefaultFile(target=StderrTarget()), operator=RedirectionOutput())
 
 
 def assert_descriptors(
@@ -152,12 +157,34 @@ def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual:
     ('"cmd" "arg1" "arg2 arg3"', QuotedWord("cmd"), (QuotedWord("arg1"), QuotedWord("arg2 arg3"))),
     ("cmd  arg1   arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
     ("'cmd'   arg1  '   arg2'", QuotedWord("cmd"), (Word("arg1"), QuotedWord("   arg2"))),
+    ("cmd 1arg 2arg", Word("cmd"), (Word("1arg"), Word("2arg"))),
 ))
 def test_multiple_words(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):
     first_cmd = parser.parse(line)
     assert first_cmd.command == command_word
     assert first_cmd.args == args_words
     assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd)
+
+
+@pytest.mark.parametrize("line,command_word,args_words", (
+    ("cmd 1", Word("cmd"), (Word("1"),)),
+    ("cmd 1 arg2", Word("cmd"), (Word("1"), Word("arg2"))),
+    ("cmd 1 2", Word("cmd"), (Word("1"), Word("2"))),
+    ("cmd 1 2 arg3", Word("cmd"), (Word("1"), Word("2"), Word("arg3"))),
+    ("cmd 1 arg2 3", Word("cmd"), (Word("1"), Word("arg2"), Word("3"))),
+    ("cmd 1 2 arg3 4", Word("cmd"), (Word("1"), Word("2"), Word("arg3"), Word("4"))),
+    ("cmd 11 222", Word("cmd"), (Word("11"), Word("222"))),
+    ("cmd 11 222 arg3", Word("cmd"), (Word("11"), Word("222"), Word("arg3"))),
+    ("cmd 11 arg2 333", Word("cmd"), (Word("11"), Word("arg2"), Word("333"))),
+    ("cmd 11 222 arg3 4444", Word("cmd"), (Word("11"), Word("222"), Word("arg3"), Word("4444"))),
+))
+def test_multiple_word_with_numeric_only_args(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):
+    first_cmd = parser.parse(line)
+    assert first_cmd.command == command_word
+    assert first_cmd.args == args_words
+    assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd)
 
 
 @pytest.mark.parametrize("line,expected_str", (
@@ -266,20 +293,27 @@ def test_empty_string_args(parser: Parser, line: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == "cmd1 ''"
     assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd)
     assert first_cmd.asynchronous == False
 
 
-@pytest.mark.parametrize("line,expected_cmd_count", (
-    ("cmd1 arg1; cmd2 arg1", 2),
-    ("cmd1  arg1 ; cmd2 'arg1'", 2),
-    ("cmd1 ' arg1 ' ;cmd2 arg1", 2),
-    ("cmd1 arg1;cmd2 arg1", 2),
-    ("cmd1;cmd2;cmd3", 3),
-    ("cmd1; cmd2; cmd3", 3),
-    ("cmd1; cmd2;", 2),
-    ("cmd1 'arg;1'; cmd2 \";;;'\" ;", 2),
+@pytest.mark.parametrize("line,expected_cmd_count,expected_strs", (
+    ("cmd1 arg1; cmd2 arg1", 2, ("cmd1 arg1", "cmd2 arg1")),
+    ("cmd1  arg1 ; cmd2 'arg1'", 2, ("cmd1 arg1", "cmd2 arg1")),
+    ("cmd1 ' arg1 ' ;cmd2 arg1", 2, ("cmd1 ' arg1 '", "cmd2 arg1")),
+    ("cmd1 arg1;cmd2 arg1", 2, ("cmd1 arg1", "cmd2 arg1")),
+    ("cmd1 'arg1';cmd2 arg1", 2, ("cmd1 arg1", "cmd2 arg1")),
+    ("cmd1 arg1;cmd2 'arg1'", 2, ("cmd1 arg1", "cmd2 arg1")),
+    ("cmd1;cmd2;cmd3", 3, ("cmd1", "cmd2", "cmd3")),
+    ("'cmd1';'cmd2';'cmd3'", 3, ("cmd1", "cmd2", "cmd3")),
+    ("'cmd1' 'arg1';'cmd2' 'arg2';'cmd3' 'arg3'", 3, ("cmd1 arg1", "cmd2 arg2", "cmd3 arg3")),
+    ("cmd1; cmd2; cmd3", 3, ("cmd1", "cmd2", "cmd3")),
+    ("'cmd1'; 'cmd2'; 'cmd3'", 3, ("cmd1", "cmd2", "cmd3")),
+    ("'cmd1';' cmd2';' cmd3'", 3, ("cmd1", "' cmd2'", "' cmd3'")),
+    ("cmd1; cmd2;", 2, ("cmd1", "cmd2")),
+    ("cmd1 'arg;1'; cmd2 \";;;'\" ;", 2, ("cmd1 'arg;1'", "cmd2 ';;;'\"'\"''")),
 ))
-def test_multiple_plain_commands(parser: Parser, line: str, expected_cmd_count: int):
+def test_multiple_plain_commands(parser: Parser, formatter: Formatter, line: str, expected_cmd_count: int, expected_strs: Tuple[str, ...]):
     first_cmd = parser.parse(line)
     assert first_cmd.next_command_operator is None
     assert_descriptors(first_cmd)
@@ -294,6 +328,10 @@ def test_multiple_plain_commands(parser: Parser, line: str, expected_cmd_count: 
         cur_cmd = cur_cmd.next_command
 
     assert actual_cmd_count == expected_cmd_count
+
+    formatted_statements = formatter.format_statements(first_cmd)
+    assert formatted_statements == expected_strs
+    assert len(formatted_statements) == expected_cmd_count
 
 
 @pytest.mark.parametrize("line,expected_cmd_count,expected_str", (
@@ -340,6 +378,12 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     ("cmd1 > 'testfile.txt'", "cmd1 > testfile.txt"),
     ("> testfile.txt cmd1 arg1", "cmd1 arg1 > testfile.txt"),
     ("> \"testfile.txt\" cmd1 'arg1 arg2'", "cmd1 'arg1 arg2' > testfile.txt"),
+    ("cmd1 'arg1 arg2'>testfile.txt", "cmd1 'arg1 arg2' > testfile.txt"),
+    ("cmd1 'arg1 arg2'xx>testfile.txt", "cmd1 'arg1 arg2xx' > testfile.txt"),
+    ("cmd1 'arg1 arg2'3>testfile.txt", "cmd1 'arg1 arg23' > testfile.txt"),
+    ("cmd1 'arg1 arg2'>testfile.txt arg3", "cmd1 'arg1 arg2' arg3 > testfile.txt"),
+    ("cmd1 'arg1 arg2'xx>testfile.txt arg3", "cmd1 'arg1 arg2xx' arg3 > testfile.txt"),
+    ("cmd1 'arg1 arg2'3>testfile.txt arg3", "cmd1 'arg1 arg23' arg3 > testfile.txt"),
 ))
 def test_redirect_output(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped appends
@@ -376,6 +420,12 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str, space_cou
     ("cmd1 >> 'testfile.txt'", "cmd1 >> testfile.txt"),
     (">> testfile.txt cmd1 arg1", "cmd1 arg1 >> testfile.txt"),
     (">> \"testfile.txt\" cmd1 'arg1 arg2'", "cmd1 'arg1 arg2' >> testfile.txt"),
+    ("cmd1 'arg1 arg2'>>testfile.txt", "cmd1 'arg1 arg2' >> testfile.txt"),
+    ("cmd1 'arg1 arg2'xx>>testfile.txt", "cmd1 'arg1 arg2xx' >> testfile.txt"),
+    ("cmd1 'arg1 arg2'3>>testfile.txt", "cmd1 'arg1 arg23' >> testfile.txt"),
+    ("cmd1 'arg1 arg2'>>testfile.txt arg3", "cmd1 'arg1 arg2' arg3 >> testfile.txt"),
+    ("cmd1 'arg1 arg2'xx>>testfile.txt arg3", "cmd1 'arg1 arg2xx' arg3 >> testfile.txt"),
+    ("cmd1 'arg1 arg2'3>>testfile.txt arg3", "cmd1 'arg1 arg23' arg3 >> testfile.txt"),
 ))
 def test_redirect_append(parser: Parser, line: str, expected_str: str, space_count: int):
     # todo add escaped outputs 
@@ -444,6 +494,7 @@ def test_pipe_and_redirect_output_left_side_only(parser: Parser, formatter: Form
 @pytest.mark.parametrize("line,expected_str", (
     ("'cmd1' | ' cmd2 ' > file2.txt", "cmd1 | ' cmd2 ' > file2.txt"),
     ("cmd1 | > file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 > file2.txt"),
+    ("cmd1 | cmd2 2arg > file2.txt", "cmd1 | cmd2 2arg > file2.txt"),
 ))
 def test_pipe_and_redirect_output_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file2.txt"), RedirectionOutput())
@@ -566,6 +617,7 @@ def test_pipe_and_redirect_append_left_side_only(parser: Parser, formatter: Form
 @pytest.mark.parametrize("line,expected_str", (
     ("'cmd1' | ' cmd2 ' >> file2.txt", "cmd1 | ' cmd2 ' >> file2.txt"),
     ("cmd1 | >> file2.txt cmd2 arg1", "cmd1 | cmd2 arg1 >> file2.txt"),
+    ("cmd1 | cmd2 2arg >> file2.txt", "cmd1 | cmd2 2arg >> file2.txt"),
 ))
 def test_pipe_and_redirect_append_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file2.txt"), RedirectionAppend())
@@ -640,6 +692,110 @@ def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatte
     check(_line.replace(">> ", redirect_chars))
     check(_line.replace(" >>", redirect_chars))
     check(_line.replace(" >> ", redirect_chars))
+
+
+def test_duplicating_descriptors(parser: Parser):
+    stmt1 = "cmd arg1 >&2"
+    cmd1 = parser.parse(stmt1)
+    assert_single_cmd(cmd1)
+    assert_descriptors(cmd1, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: DEFAULT_DESCRIPTOR_STDERR})
+    assert str(cmd1) == "cmd arg1 > /dev/stderr"
+
+    stmt2 = "cmd arg1 >&2 2>&-"
+    cmd2 = parser.parse(stmt2)
+    assert_single_cmd(cmd2)
+    assert_descriptors(cmd2, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: DEFAULT_DESCRIPTOR_STDERR}, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
+    assert str(cmd2) == "cmd arg1 > /dev/stderr 2>&-"
+
+    stmt3 = "cmd arg1 22>&2 >33 44>&22"
+    cmd3 = parser.parse(stmt3)
+    assert_single_cmd(cmd3)
+    cmd3_files = {
+        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="33"), RedirectionOutput()),
+        22: DEFAULT_DESCRIPTOR_STDERR,
+        44: DEFAULT_DESCRIPTOR_STDERR,
+    }
+    assert_descriptors(cmd3, files=cmd3_files)
+    assert str(cmd3) == "cmd arg1 > 33 22> /dev/stderr 44> /dev/stderr"
+
+    stmt4 = "cmd arg1 22>&2 >44 44>&22 2>&-"
+    cmd4 = parser.parse(stmt4)
+    assert_single_cmd(cmd4)
+    cmd4_files = {
+        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="44"), RedirectionOutput()),
+        22: DEFAULT_DESCRIPTOR_STDERR,
+        44: DEFAULT_DESCRIPTOR_STDERR,
+    }
+    assert_descriptors(cmd4, files=cmd4_files, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
+    assert str(cmd4) == "cmd arg1 > 44 2>&- 22> /dev/stderr 44> /dev/stderr"
+
+
+@pytest.mark.parametrize("line,descriptors,expected_str", (
+    ("cmd arg1 >&-", frozenset((1,)), "cmd arg1 >&-"),
+    ("cmd arg1 >& -", frozenset((1,)), "cmd arg1 >&-"),
+    ("cmd arg1 2>&- >&-", frozenset((1, 2)), "cmd arg1 >&- 2>&-"),
+    ("cmd 'arg1 arg2'>&-", frozenset((1,)), "cmd 'arg1 arg2' >&-"),
+    ("cmd 'arg1 arg2'2>&-", frozenset((1,)), "cmd 'arg1 arg22' >&-"),
+    ("cmd 'arg1 arg2'2>&-2>&-", frozenset((1, 2)), "cmd 'arg1 arg22' >&- 2>&-"),
+    ("cmd 'arg1 arg2'>&- arg3", frozenset((1,)), "cmd 'arg1 arg2' arg3 >&-"),
+    ("cmd 'arg1 arg2'2>&- arg3", frozenset((1,)), "cmd 'arg1 arg22' arg3 >&-"),
+    ("cmd 'arg1 arg2'2>&-2>&- arg3", frozenset((1, 2)), "cmd 'arg1 arg22' arg3 >&- 2>&-"),
+    ("cmd arg1 arg2>&-", frozenset((1,)), "cmd arg1 arg2 >&-"),
+    ("cmd arg1 2>&-", frozenset((2,)), "cmd arg1 2>&-"),
+    ("cmd arg1 \\2>&-", frozenset((1,)), "cmd arg1 2 >&-"),
+    ("cmd arg1 'arg2'>&-'arg3'", frozenset((1,)), "cmd arg1 arg2 arg3 >&-"),
+    ("cmd arg1 1000>&-", frozenset((1000,)), "cmd arg1 1000>&-"),
+    ("cmd arg1 >&--", frozenset((1,)), "cmd arg1 - >&-"),
+))
+def test_closing_descriptors(parser: Parser, line: str, descriptors: Set[int], expected_str: str):
+    first_cmd = parser.parse(line)
+    assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd, closed=descriptors)
+    assert str(first_cmd) == expected_str
+
+
+@pytest.mark.parametrize("line", (
+    "cmd >&a",
+    "cmd >&1a",
+    "cmd >&a1",
+    "cmd >&1a1",
+    "cmd >&a1a",
+))
+def test_ambiguous_descriptor_redirects(parser: Parser, line: str):
+    def check(_line: str):
+        with pytest.raises(AmbiguousRedirectParserFailure):
+            parser.parse(_line)
+        with pytest.raises(AmbiguousRedirectParserFailure):
+            parser.parse(_line.replace("cmd", "cmd arg1"))
+        with pytest.raises(AmbiguousRedirectParserFailure):
+            parser.parse(_line.replace("cmd ", "cmd arg1"))
+        with pytest.raises(AmbiguousRedirectParserFailure):
+            parser.parse(_line.replace("cmd ", "cmd 'arg1'"))
+
+    check(line)
+    check(line.replace(">", "2>"))
+
+
+@pytest.mark.parametrize("line", (
+    "cmd >>&a",
+    "cmd >>&1a",
+    "cmd >>&a1",
+    "cmd >>&1a1",
+    "cmd >>&a1a",
+))
+def test_invalid_redirections(parser: Parser, line: str):
+    def check(_line: str):
+        with pytest.raises(InvalidRedirectionParserFailure):
+            parser.parse(_line)
+        with pytest.raises(InvalidRedirectionParserFailure):
+            parser.parse(_line.replace("cmd", "cmd arg1"))
+        with pytest.raises(InvalidRedirectionParserFailure):
+            parser.parse(_line.replace("cmd ", "cmd arg1"))
+        with pytest.raises(InvalidRedirectionParserFailure):
+            parser.parse(_line.replace("cmd ", "cmd 'arg1'"))
+
+    check(line)
+    check(line.replace(">>", "2>>"))
 
 
 @pytest.mark.parametrize("pipe_space_count", range(-1, 4))
@@ -830,6 +986,7 @@ def test_empty_redirect_filename(parser: Parser, line: str):
     "cmd1 >",
     "cmd1 >>",
     "cmd1 |",
+    "cmd1 >&",
 ))
 def test_unexpected_statementfinish(parser: Parser, line: str):
     with pytest.raises(UnexpectedStatementFinishParserFailure):

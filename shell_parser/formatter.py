@@ -1,8 +1,9 @@
+from typing import Sequence
 from .ast import *
 
 
 class Formatter(object):
-    def format_statement(self, first_cmd: Command):
+    def format_statement(self, first_cmd: Command) -> str:
         statement = str(first_cmd)
         cur_pipe_cmd = first_cmd.pipe_command
         while cur_pipe_cmd:
@@ -10,7 +11,7 @@ class Formatter(object):
             cur_pipe_cmd = cur_pipe_cmd.pipe_command
         return statement
 
-    def format_statements(self, first_cmd: Command):
+    def format_statements(self, first_cmd: Command) -> Sequence[str]:
         statements = []
         cmd = first_cmd
         while cmd:
@@ -28,4 +29,4 @@ class Formatter(object):
                 cmd = cmd.next_command
 
             statements.append(statement)
-        return statements
+        return tuple(statements)

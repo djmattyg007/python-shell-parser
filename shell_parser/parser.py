@@ -198,6 +198,7 @@ class Parser(object):
                         raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
 
                     END_WORD()
+                    was_quote_mode = False
 
                     if current_descriptor is None:
                         current_descriptor = 1
@@ -284,10 +285,8 @@ class Parser(object):
                             break
                         elif next_char in NUMBERS:
                             possible_descriptor += next_char
-                        elif next_char:
-                            WRITE_CHAR(possible_descriptor)
-                            break
                         else:
+                            WRITE_CHAR(possible_descriptor)
                             break
                         next_char = NEXT_CHAR(fail_if_end=False)
                         pos += 1

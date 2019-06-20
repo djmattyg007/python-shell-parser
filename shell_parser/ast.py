@@ -101,11 +101,6 @@ class DefaultFile(object):
         return isinstance(self.target, StderrTarget)
 
 
-class Pipe(object):
-    def __str__(self):
-        return "|"
-
-
 @dataclass(frozen=True)
 class RedirectionInput(object):
     def __str__(self):
@@ -192,12 +187,12 @@ class CommandDescriptor(object):
     def __post_init__(self):
         if isinstance(self.mode, DescriptorRead):
             if not isinstance(self.descriptor.operator, RedirectionInput):
-                raise Exception()
+                raise InvalidDescriptorDataException()
         elif isinstance(self.mode, DescriptorWrite):
             if not isinstance(self.descriptor.operator, (RedirectionOutput, RedirectionAppend)):
-                raise Exception()
+                raise InvalidDescriptorDataException()
         else:
-            raise Exception()
+            raise InvalidDescriptorDataException()
 
     def duplicate(self) -> 'CommandDescriptor':
         return CommandDescriptor(
@@ -222,7 +217,10 @@ class CommandDescriptors(object):
         args = []
         for fd in fds:
             if isinstance(descriptors[fd], CommandDescriptorClosed):
-                args.append(str(fd) + ">&-")
+                if fd == DESCRIPTOR_DEFAULT_INDEX_STDOUT:
+                    args.append(">&-")
+                else:
+                    args.append(str(fd) + ">&-")
                 continue
 
             arg = ""
@@ -363,6 +361,10 @@ class BadFileDescriptorException(Exception):
     pass
 
 
+class InvalidDescriptorDataException(Exception):
+    pass
+
+
 class InvalidFileDescriptorException(Exception):
     pass
 
@@ -432,7 +434,6 @@ __all__ = [
     "StdoutTarget",
     "StderrTarget",
     "DefaultFile",
-    "Pipe",
     "RedirectionInput",
     "RedirectionOutput",
     "RedirectionAppend",
@@ -448,6 +449,7 @@ __all__ = [
     "InvalidCommandDataException",
     "CommandDescriptorsBuilder",
     "BadFileDescriptorException",
+    "InvalidDescriptorDataException",
     "InvalidFileDescriptorException",
     "CommandBuilder",
     "CommandBuilderCreateException",
