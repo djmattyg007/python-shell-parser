@@ -191,7 +191,7 @@ class Parser(object):
                 if prev_char == "\\":
                     WRITE_CHAR(char)
                 else:
-                    if redirect_mode:
+                    if redirect_mode and not cur_word:
                         raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
 
                     END_WORD()
@@ -213,6 +213,30 @@ class Parser(object):
                             modifying_descriptor = True
                             pos += 1
                             next_char = NEXT_CHAR()
+
+                    while next_char in WHITESPACE:
+                        pos += 1
+                        next_char = NEXT_CHAR()
+
+            elif char == "<":
+                if prev_char == "\\":
+                    WRITE_CHAR(char)
+                else:
+                    if redirect_mode:
+                        raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
+
+                    END_WORD()
+                    was_quote_mode = False
+
+                    if current_descriptor is None:
+                        current_descriptor = 0
+
+                    redirect_mode = "<"
+                    next_char = NEXT_CHAR()
+                    if next_char == "&":
+                        modifying_descriptor = True
+                        pos += 1
+                        next_char = NEXT_CHAR()
 
                     while next_char in WHITESPACE:
                         pos += 1

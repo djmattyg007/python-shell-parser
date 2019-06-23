@@ -707,27 +707,39 @@ def test_duplicating_descriptors(parser: Parser):
     assert_descriptors(cmd2, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: DEFAULT_DESCRIPTOR_STDERR}, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
     assert str(cmd2) == "cmd arg1 > /dev/stderr 2>&-"
 
-    stmt3 = "cmd arg1 22>&2 >33 44>&22"
+    stmt3 = "cmd 'arg1 arg2'2>&-"
     cmd3 = parser.parse(stmt3)
     assert_single_cmd(cmd3)
-    cmd3_files = {
+    assert_descriptors(cmd3, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDOUT,)))
+    assert str(cmd3) == "cmd 'arg1 arg22' >&-"
+
+    stmt4 = "cmd arg1 2>&1"
+    cmd4 = parser.parse(stmt4)
+    assert_single_cmd(cmd4)
+    assert_descriptors(cmd4, files={DESCRIPTOR_DEFAULT_INDEX_STDERR: DEFAULT_DESCRIPTOR_STDOUT})
+    assert str(cmd4) == "cmd arg1 2> /dev/stdout"
+
+    stmt5 = "cmd arg1 22>&2 >33 44>&22"
+    cmd5 = parser.parse(stmt5)
+    assert_single_cmd(cmd5)
+    cmd5_files = {
         DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="33"), RedirectionOutput()),
         22: DEFAULT_DESCRIPTOR_STDERR,
         44: DEFAULT_DESCRIPTOR_STDERR,
     }
-    assert_descriptors(cmd3, files=cmd3_files)
-    assert str(cmd3) == "cmd arg1 > 33 22> /dev/stderr 44> /dev/stderr"
+    assert_descriptors(cmd5, files=cmd5_files)
+    assert str(cmd5) == "cmd arg1 > 33 22> /dev/stderr 44> /dev/stderr"
 
-    stmt4 = "cmd arg1 22>&2 >44 44>&22 2>&-"
-    cmd4 = parser.parse(stmt4)
-    assert_single_cmd(cmd4)
-    cmd4_files = {
+    stmt6 = "cmd arg1 22>&2 >44 44>&22 2>&-"
+    cmd6 = parser.parse(stmt6)
+    assert_single_cmd(cmd6)
+    cmd6_files = {
         DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="44"), RedirectionOutput()),
         22: DEFAULT_DESCRIPTOR_STDERR,
         44: DEFAULT_DESCRIPTOR_STDERR,
     }
-    assert_descriptors(cmd4, files=cmd4_files, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
-    assert str(cmd4) == "cmd arg1 > 44 2>&- 22> /dev/stderr 44> /dev/stderr"
+    assert_descriptors(cmd6, files=cmd6_files, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
+    assert str(cmd6) == "cmd arg1 > 44 2>&- 22> /dev/stderr 44> /dev/stderr"
 
 
 @pytest.mark.parametrize("line,descriptors,expected_str", (
@@ -774,6 +786,45 @@ def test_ambiguous_descriptor_redirects(parser: Parser, line: str):
 
     check(line)
     check(line.replace(">", "2>"))
+
+
+def test_unusual_descriptor_redirects(parser: Parser):
+    stmt1 = "cmd1 2>&2"
+    cmd1 = parser.parse(stmt1)
+    assert_single_cmd(cmd1)
+    assert_descriptors(cmd1)
+    assert str(cmd1) == "cmd1"
+
+    stmt2 = "cmd2 2>test2.txt 2>&2"
+    cmd2 = parser.parse(stmt2)
+    assert_single_cmd(cmd2)
+    assert_descriptors(cmd2, files={DESCRIPTOR_DEFAULT_INDEX_STDERR: make_descriptor(File(name="test2.txt"), RedirectionOutput())})
+    assert str(cmd2) == "cmd2 2> test2.txt"
+
+    stmt3 = "cmd3 2>test3.txt2>&2"
+    cmd3 = parser.parse(stmt3)
+    assert_single_cmd(cmd3)
+    cmd3_files = {
+        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
+        DESCRIPTOR_DEFAULT_INDEX_STDERR: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
+    }
+    assert_descriptors(cmd3, files=cmd3_files)
+    assert str(cmd3) == "cmd3 > test3.txt2 2> test3.txt2"
+
+    stmt4 = "cmd4 \\2>test4.txt2>&2"
+    cmd4 = parser.parse(stmt4)
+    assert_single_cmd(cmd4)
+    cmd4_files = {
+        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(DefaultFile(target=StderrTarget()), RedirectionOutput()),
+    }
+    assert_descriptors(cmd4, files=cmd4_files)
+    assert str(cmd4) == "cmd4 2 > /dev/stderr"
+
+    stmt5 = "cmd5 0> test5.txt"
+    cmd5 = parser.parse(stmt5)
+    assert_single_cmd(cmd5)
+    assert_descriptors(cmd5, files={DESCRIPTOR_DEFAULT_INDEX_STDIN: make_descriptor(File(name="test5.txt"), RedirectionOutput())})
+    assert str(cmd5) == "cmd5 0> test5.txt"
 
 
 @pytest.mark.parametrize("line", (
