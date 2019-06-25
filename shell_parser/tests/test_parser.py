@@ -211,6 +211,10 @@ def test_multiple_word_with_numeric_only_args(parser: Parser, line: str, command
     ("cmd1 \\>arg1", "cmd1 '>arg1'"),
     ("cmd1 \\>\\ arg1", "cmd1 '> arg1'"),
     ("cmd1 \\>\\>arg1", "cmd1 '>>arg1'"),
+    ("cmd1 \\<", "cmd1 '<'"),
+    ("cmd1 \\< arg2", "cmd1 '<' arg2"),
+    ("cmd1 \\<arg1", "cmd1 '<arg1'"),
+    ("cmd1 \\<\\ arg1", "cmd1 '< arg1'"),
     ("cmd1 \\&", "cmd1 '&'"),
     ("cmd1 \\&\\&", "cmd1 '&&'"),
     ("cmd1 \\& arg2", "cmd1 '&' arg2"),
@@ -1042,6 +1046,23 @@ def test_empty_redirect_filename(parser: Parser, line: str):
 
     check(line)
     check(line.replace(">", ">>"))
+    check(line.replace(">", "<"))
+
+
+@pytest.mark.parametrize("line", (
+    "cmd > >",
+    "cmd > >>",
+    "cmd > <",
+    "cmd >> >",
+    "cmd >> >>",
+    "cmd >> <",
+    "cmd < >",
+    "cmd < >>",
+    "cmd < <",
+))
+def test_empty_redirect_filename_special(parser: Parser, line: str):
+    with pytest.raises(EmptyRedirectParserFailure, match=re.escape("No redirect filename provided.")):
+        parser.parse(line)
 
 
 @pytest.mark.parametrize("line", (
