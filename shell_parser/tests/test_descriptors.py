@@ -3,7 +3,8 @@ import pytest
 import dataclasses
 import re
 
-from shell_parser.ast import CommandDescriptor, CommandDescriptorClosed, CommandFileDescriptor, InvalidDescriptorDataException
+from shell_parser.ast import CommandDescriptors, CommandDescriptor, CommandDescriptorClosed, CommandFileDescriptor
+from shell_parser.ast import InvalidDescriptorDataException, InvalidFileDescriptorException
 from shell_parser.ast import DescriptorRead, DescriptorWrite, RedirectionInput, RedirectionOutput, RedirectionAppend
 from shell_parser.ast import File, DefaultFile, StdinTarget, StdoutTarget, StderrTarget
 
@@ -65,3 +66,17 @@ def test_closed_descriptor():
     # CommandDescriptorClosed doesn't store any state, so duplicating it
     # just returns the original object.
     assert duplicated_test_closed is test_closed
+
+
+def test_descriptor_container():
+    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+        CommandDescriptors({"a": CommandDescriptorClosed()})
+    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+        CommandDescriptors({True: CommandDescriptorClosed(), 2: CommandDescriptorClosed()})
+    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+        CommandDescriptors({1: CommandDescriptorClosed(), None: CommandDescriptorClosed()})
+
+    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must not be negative")):
+        CommandDescriptors({-1: CommandDescriptorClosed()})
+    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must not be negative")):
+        CommandDescriptors({2: CommandDescriptorClosed(), -1: CommandDescriptorClosed()})

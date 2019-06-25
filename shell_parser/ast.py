@@ -201,8 +201,10 @@ class CommandDescriptors(object):
     descriptors: Mapping[int, Union[CommandDescriptor, CommandDescriptorClosed]]
 
     def __post_init__(self):
-        for fd in self.descriptors:
-            if not isinstance(fd, int) or fd < 0:
+        for fd in self.descriptors.keys():
+            if type(fd) is not int:
+                raise InvalidFileDescriptorException("File descriptors must be integers")
+            if fd < 0:
                 raise InvalidFileDescriptorException("File descriptors must not be negative")
 
     @property

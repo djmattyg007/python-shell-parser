@@ -301,7 +301,7 @@ class Parser(object):
                     next_char = NEXT_CHAR(fail_if_end=False)
                     pos += 1
                     while True:
-                        if next_char == ">":
+                        if next_char == ">" or next_char == "<":
                             current_descriptor = int(possible_descriptor)
                             break
                         elif next_char in NUMBERS:

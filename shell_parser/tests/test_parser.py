@@ -826,6 +826,17 @@ def test_unusual_descriptor_redirects(parser: Parser):
     assert_descriptors(cmd5, files={DESCRIPTOR_DEFAULT_INDEX_STDIN: make_descriptor(File(name="test5.txt"), RedirectionOutput())})
     assert str(cmd5) == "cmd5 0> test5.txt"
 
+    stmt6 = "cmd6 1< test6.txt"
+    cmd6 = parser.parse(stmt6)
+    assert_single_cmd(cmd6)
+    assert_descriptors(cmd6, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="test6.txt"), RedirectionInput())})
+    assert str(cmd6) == "cmd6 1< test6.txt"
+
+    stmt7 = "cmd7 22<&0"
+    cmd7 = parser.parse(stmt7)
+    assert_single_cmd(cmd7)
+    assert_descriptors(cmd7, files={22: make_descriptor(DefaultFile(target=StdinTarget()), RedirectionInput())})
+    assert str(cmd7) == "cmd7 22< /dev/stdin"
 
 @pytest.mark.parametrize("line", (
     "cmd >>&a",
