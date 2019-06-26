@@ -195,6 +195,14 @@ class CommandDescriptor(object):
             descriptor=self.descriptor.duplicate(),
         )
 
+    @property
+    def for_reading(self) -> bool:
+        return isinstance(self.mode, DescriptorRead)
+
+    @property
+    def for_writing(self) -> bool:
+        return isinstance(self.mode, DescriptorWrite)
+
 
 @dataclass(frozen=True)
 class CommandDescriptors(object):
@@ -300,29 +308,32 @@ class CommandDescriptorsBuilder(object):
     descriptors: Dict[int, Union[CommandDescriptor, CommandDescriptorClosed]] = field(default_factory=dict)
 
     def __post_init__(self):
-        self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDIN] = CommandDescriptor(
-            mode=DescriptorRead(),
-            descriptor=CommandFileDescriptor(
-                target=DefaultFile(target=StdinTarget()),
-                operator=RedirectionInput()
+        if DESCRIPTOR_DEFAULT_INDEX_STDIN not in self.descriptors:
+            self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDIN] = CommandDescriptor(
+                mode=DescriptorRead(),
+                descriptor=CommandFileDescriptor(
+                    target=DefaultFile(target=StdinTarget()),
+                    operator=RedirectionInput()
+                )
             )
-        )
 
-        self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDOUT] = CommandDescriptor(
-            mode=DescriptorWrite(),
-            descriptor=CommandFileDescriptor(
-                target=DefaultFile(target=StdoutTarget()),
-                operator=RedirectionOutput()
+        if DESCRIPTOR_DEFAULT_INDEX_STDOUT not in self.descriptors:
+            self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDOUT] = CommandDescriptor(
+                mode=DescriptorWrite(),
+                descriptor=CommandFileDescriptor(
+                    target=DefaultFile(target=StdoutTarget()),
+                    operator=RedirectionOutput()
+                )
             )
-        )
 
-        self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDERR] = CommandDescriptor(
-            mode=DescriptorWrite(),
-            descriptor=CommandFileDescriptor(
-                target=DefaultFile(target=StderrTarget()),
-                operator=RedirectionOutput()
+        if DESCRIPTOR_DEFAULT_INDEX_STDERR not in self.descriptors:
+            self.descriptors[DESCRIPTOR_DEFAULT_INDEX_STDERR] = CommandDescriptor(
+                mode=DescriptorWrite(),
+                descriptor=CommandFileDescriptor(
+                    target=DefaultFile(target=StderrTarget()),
+                    operator=RedirectionOutput()
+                )
             )
-        )
 
     def set_descriptor(self, fd: int, descriptor: CommandDescriptor):
         if fd < 0:
