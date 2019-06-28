@@ -6,7 +6,7 @@ class Formatter(object):
     def format_statement(self, first_cmd: Command) -> str:
         statement = str(first_cmd)
         cur_pipe_cmd = first_cmd.pipe_command
-        while cur_pipe_cmd:
+        while cur_pipe_cmd is not None:
             statement += " | " + str(cur_pipe_cmd)
             cur_pipe_cmd = cur_pipe_cmd.pipe_command
         return statement
@@ -15,10 +15,10 @@ class Formatter(object):
         statements = []
         cmd = first_cmd
         while cmd:
-            if cmd.next_command_operator:
+            if cmd.next_command_operator is not None:
                 cur_cmd = cmd
                 statement = ""
-                while cur_cmd.next_command_operator:
+                while cur_cmd.next_command_operator is not None:
                     statement += self.format_statement(cur_cmd)
                     statement += " " + str(cur_cmd.next_command_operator) + " "
                     cur_cmd = cur_cmd.next_command

@@ -9,11 +9,15 @@ from shell_parser.ast import DescriptorRead, DescriptorWrite, RedirectionInput, 
 from shell_parser.ast import File, DefaultFile, StdinTarget, StdoutTarget, StderrTarget
 
 
+def make_match(msg: str) -> str:
+    return "^" + re.escape(msg) + "$"
+
+
 def test_missing_compulsory_data():
-    with pytest.raises(TypeError, match=re.escape("__init__() missing 2 required positional arguments: 'mode' and 'descriptor'")):
+    with pytest.raises(TypeError, match=make_match("__init__() missing 2 required positional arguments: 'mode' and 'descriptor'")):
         CommandDescriptor()
 
-    with pytest.raises(TypeError, match=re.escape("__init__() missing 1 required positional argument: 'descriptor'")):
+    with pytest.raises(TypeError, match=make_match("__init__() missing 1 required positional argument: 'descriptor'")):
         CommandDescriptor(mode=DescriptorRead())
 
 
@@ -69,14 +73,14 @@ def test_closed_descriptor():
 
 
 def test_descriptor_container():
-    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+    with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must be integers")):
         CommandDescriptors({"a": CommandDescriptorClosed()})
-    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+    with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must be integers")):
         CommandDescriptors({True: CommandDescriptorClosed(), 2: CommandDescriptorClosed()})
-    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must be integers")):
+    with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must be integers")):
         CommandDescriptors({1: CommandDescriptorClosed(), None: CommandDescriptorClosed()})
 
-    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must not be negative")):
+    with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must not be negative")):
         CommandDescriptors({-1: CommandDescriptorClosed()})
-    with pytest.raises(InvalidFileDescriptorException, match=re.escape("File descriptors must not be negative")):
+    with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must not be negative")):
         CommandDescriptors({2: CommandDescriptorClosed(), -1: CommandDescriptorClosed()})

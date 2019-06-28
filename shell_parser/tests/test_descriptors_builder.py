@@ -14,6 +14,10 @@ DEFAULT_DESCRIPTOR_FDS = frozenset((
 ))
 
 
+def make_match(msg: str) -> str:
+    return "^" + re.escape(msg) + "$"
+
+
 def test_default_init():
     builder = CommandDescriptorsBuilder()
     assert builder.descriptors.keys() == DEFAULT_DESCRIPTOR_FDS
@@ -41,3 +45,9 @@ def test_default_init():
     assert stderr.descriptor.target.is_stdin == False
     assert stderr.descriptor.target.is_stdout == False
     assert stderr.descriptor.target.is_stderr == True
+
+
+def test_non_equality():
+    builder1 = CommandDescriptorsBuilder()
+    builder2 = CommandDescriptorsBuilder()
+    assert builder1 != builder2

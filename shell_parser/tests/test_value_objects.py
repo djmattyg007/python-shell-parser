@@ -1,5 +1,6 @@
 import pytest
 
+from dataclasses import FrozenInstanceError
 from typing import Union
 
 from shell_parser.ast import *
@@ -8,6 +9,8 @@ from shell_parser.ast import *
 def test_word():
     test_word = Word(word="abc123")
     assert repr(test_word) == "<Word word=abc123>"
+    with pytest.raises(FrozenInstanceError):
+        test_word.word = "def456"
 
 
 def test_file():
@@ -19,11 +22,17 @@ def test_file():
     assert duplicated_test_file == test_file
     assert duplicated_test_file is not test_file
 
+    with pytest.raises(FrozenInstanceError):
+        test_file.name = "test2.txt"
+
 
 def test_stdin_target():
     test_target = StdinTarget()
     assert repr(test_target) == "<StdinTarget>"
     assert str(test_target) == "stdin"
+
+    with pytest.raises(FrozenInstanceError):
+        test_target.newattr = "newattr"
 
 
 def test_stdout_target():
@@ -31,11 +40,17 @@ def test_stdout_target():
     assert repr(test_target) == "<StdoutTarget>"
     assert str(test_target) == "stdout"
 
+    with pytest.raises(FrozenInstanceError):
+        test_target.newattr = "newattr"
+
 
 def test_stderr_target():
     test_target = StderrTarget()
     assert repr(test_target) == "<StderrTarget>"
     assert str(test_target) == "stderr"
+
+    with pytest.raises(FrozenInstanceError):
+        test_target.newattr = "newattr"
 
 
 def test_default_file():
@@ -46,12 +61,18 @@ def test_default_file():
     assert not test_stdin_file.is_stdout
     assert not test_stdin_file.is_stderr
 
+    with pytest.raises(FrozenInstanceError):
+        test_stdin_file.target = StdoutTarget()
+
     test_stdout_file = DefaultFile(target=StdoutTarget())
     assert repr(test_stdout_file) == "<DefaultFile target=stdout>"
     assert str(test_stdout_file) == "stdout"
     assert not test_stdout_file.is_stdin
     assert test_stdout_file.is_stdout
     assert not test_stdout_file.is_stderr
+
+    with pytest.raises(FrozenInstanceError):
+        test_stdout_file.target = StderrTarget()
 
     test_stderr_file = DefaultFile(target=StderrTarget())
     assert repr(test_stderr_file) == "<DefaultFile target=stderr>"
@@ -60,11 +81,17 @@ def test_default_file():
     assert not test_stderr_file.is_stdout
     assert test_stderr_file.is_stderr
 
+    with pytest.raises(FrozenInstanceError):
+        test_stderr_file.target = StdinTarget()
+
 
 def test_redirection_input():
     test_redirect = RedirectionInput()
     assert repr(test_redirect) == "<RedirectionInput>"
     assert str(test_redirect) == "<"
+
+    with pytest.raises(FrozenInstanceError):
+        test_redirect.newattr = "newattr"
 
 
 def test_redirection_output():
@@ -72,11 +99,17 @@ def test_redirection_output():
     assert repr(test_redirect) == "<RedirectionOutput>"
     assert str(test_redirect) == ">"
 
+    with pytest.raises(FrozenInstanceError):
+        test_redirect.newattr = "newattr"
+
 
 def test_redirection_append():
     test_redirect = RedirectionAppend()
     assert repr(test_redirect) == "<RedirectionAppend>"
     assert str(test_redirect) == ">>"
+
+    with pytest.raises(FrozenInstanceError):
+        test_redirect.newattr = "newattr"
 
 
 def test_operator_and():
@@ -84,8 +117,14 @@ def test_operator_and():
     assert repr(test_operator) == "<OperatorAnd>"
     assert str(test_operator) == "&&"
 
+    with pytest.raises(FrozenInstanceError):
+        test_operator.newattr = "newattr"
+
 
 def test_operator_or():
     test_operator = OperatorOr()
     assert repr(test_operator) == "<OperatorOr>"
     assert str(test_operator) == "||"
+
+    with pytest.raises(FrozenInstanceError):
+        test_operator.newattr = "newattr"

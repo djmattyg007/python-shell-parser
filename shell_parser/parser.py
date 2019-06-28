@@ -70,7 +70,7 @@ class Parser(object):
         def END_WORD():
             nonlocal cur_word, was_quote_mode, cmd_builder, redirect_mode, current_descriptor, modifying_descriptor
             breaker()
-            if redirect_mode:
+            if redirect_mode is not None:
                 if not cur_word:
                     raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
                 if redirect_mode == "<":
@@ -100,7 +100,7 @@ class Parser(object):
                     cmd_builder.descriptors.set_descriptor(current_descriptor, descriptor)
 
                 cur_word = ""
-                redirect_mode = False
+                redirect_mode = None
                 current_descriptor = None
                 modifying_descriptor = False
             else:
@@ -191,7 +191,7 @@ class Parser(object):
                 if prev_char == "\\":
                     WRITE_CHAR(char)
                 else:
-                    if redirect_mode and not cur_word:
+                    if redirect_mode is not None and not cur_word:
                         raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
 
                     END_WORD()
@@ -222,7 +222,7 @@ class Parser(object):
                 if prev_char == "\\":
                     WRITE_CHAR(char)
                 else:
-                    if redirect_mode:
+                    if redirect_mode is not None:
                         raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
 
                     END_WORD()
@@ -296,7 +296,7 @@ class Parser(object):
             elif char in NUMBERS:
                 if prev_char == "\\":
                     WRITE_CHAR(char)
-                elif not cur_word and not redirect_mode:
+                elif not cur_word and redirect_mode is None:
                     possible_descriptor = char
                     next_char = NEXT_CHAR(fail_if_end=False)
                     pos += 1

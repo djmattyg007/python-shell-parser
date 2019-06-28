@@ -9,6 +9,10 @@ from shell_parser.parser import *
 from typing import Mapping, Set, Tuple, Union
 
 
+def make_match(msg: str) -> str:
+    return "^" + re.escape(msg) + "$"
+
+
 def assert_single_cmd(cmd: Command):
     assert cmd.pipe_command is None
     assert cmd.next_command is None
@@ -78,7 +82,7 @@ def formatter() -> Formatter:
 
 
 def test_empty_string(parser: Parser):
-    with pytest.raises(EmptyInputException, match=re.escape("Input statement was empty or contained only whitespace.")):
+    with pytest.raises(EmptyInputException, match=make_match("Input statement was empty or contained only whitespace.")):
         parser.parse("")
 
 
@@ -94,7 +98,7 @@ def test_empty_string(parser: Parser):
     "   \t\t\t",
 ))
 def test_only_whitespace(parser: Parser, line: str):
-    with pytest.raises(EmptyInputException, match=re.escape("Input statement was empty or contained only whitespace.")):
+    with pytest.raises(EmptyInputException, match=make_match("Input statement was empty or contained only whitespace.")):
         parser.parse(line)
 
 
@@ -122,6 +126,7 @@ def test_single_word(parser: Parser, line: str, expected_str: Word):
     assert first_cmd.asynchronous == False
 
 
+@pytest.mark.parametrize("space_char", (" ", "\t"))
 @pytest.mark.parametrize("before_space_count", range(0, 4))
 @pytest.mark.parametrize("after_space_count", range(0, 4))
 @pytest.mark.parametrize("manual,nonmanual", (
@@ -138,9 +143,9 @@ def test_single_word(parser: Parser, line: str, expected_str: Word):
     (r"'one\ word';", r"'one\ word'"),
     (r'"one\ word";', r'"one\ word"'),
 ))
-def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual: str, before_space_count: int, after_space_count: int):
-    before_spaces = " " * before_space_count
-    after_spaces = " " * after_space_count
+def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual: str, before_space_count: int, after_space_count: int, space_char: str):
+    before_spaces = space_char * before_space_count
+    after_spaces = space_char * after_space_count
     _manual = manual.replace(";", before_spaces + ";" + after_spaces)
     manual_first_cmd = parser.parse(_manual)
     nonmanual_first_cmd = parser.parse(nonmanual)
@@ -158,6 +163,14 @@ def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual:
     ("cmd  arg1   arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
     ("'cmd'   arg1  '   arg2'", Word("cmd"), (Word("arg1"), Word("   arg2"))),
     ("cmd 1arg 2arg", Word("cmd"), (Word("1arg"), Word("2arg"))),
+    ("cmd\targ1", Word("cmd"), (Word("arg1"),)),
+    ("cmd\targ1\targ2", Word("cmd"), (Word("arg1"), Word("arg2"))),
+    ("cmd\targ1\targ2\targ3", Word("cmd"), (Word("arg1"), Word("arg2"), Word("arg3"))),
+    ("'cmd'\t'arg1\targ2'\targ3", Word("cmd"), (Word("arg1\targ2"), Word("arg3"))),
+    ('"cmd"\t"arg1"\t"arg2\targ3"', Word("cmd"), (Word("arg1"), Word("arg2\targ3"))),
+    ("cmd \t arg1  \t arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
+    ("'cmd' \t arg1\t ' \t  arg2'", Word("cmd"), (Word("arg1"), Word(" \t  arg2"))),
+    ("cmd\t1arg\t2arg", Word("cmd"), (Word("1arg"), Word("2arg"))),
 ))
 def test_multiple_words(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):
     first_cmd = parser.parse(line)
@@ -178,6 +191,16 @@ def test_multiple_words(parser: Parser, line: str, command_word: Word, args_word
     ("cmd 11 222 arg3", Word("cmd"), (Word("11"), Word("222"), Word("arg3"))),
     ("cmd 11 arg2 333", Word("cmd"), (Word("11"), Word("arg2"), Word("333"))),
     ("cmd 11 222 arg3 4444", Word("cmd"), (Word("11"), Word("222"), Word("arg3"), Word("4444"))),
+    ("cmd\t1", Word("cmd"), (Word("1"),)),
+    ("cmd\t1\targ2", Word("cmd"), (Word("1"), Word("arg2"))),
+    ("cmd\t1\t2", Word("cmd"), (Word("1"), Word("2"))),
+    ("cmd\t1\t2\targ3", Word("cmd"), (Word("1"), Word("2"), Word("arg3"))),
+    ("cmd\t1\targ2\t3", Word("cmd"), (Word("1"), Word("arg2"), Word("3"))),
+    ("cmd\t1\t2\targ3\t4", Word("cmd"), (Word("1"), Word("2"), Word("arg3"), Word("4"))),
+    ("cmd\t11\t222", Word("cmd"), (Word("11"), Word("222"))),
+    ("cmd\t11\t222\targ3", Word("cmd"), (Word("11"), Word("222"), Word("arg3"))),
+    ("cmd\t11\targ2\t333", Word("cmd"), (Word("11"), Word("arg2"), Word("333"))),
+    ("cmd\t11\t222\targ3\t4444", Word("cmd"), (Word("11"), Word("222"), Word("arg3"), Word("4444"))),
 ))
 def test_multiple_word_with_numeric_only_args(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):
     first_cmd = parser.parse(line)
@@ -1041,7 +1064,7 @@ def test_mixed_next_cmd_operators(parser: Parser, formatter: Formatter, line: st
 ))
 def test_empty_redirect_filename(parser: Parser, line: str):
     def check(_line: str):
-        with pytest.raises(EmptyRedirectParserFailure, match=re.escape("No redirect filename provided.")):
+        with pytest.raises(EmptyRedirectParserFailure, match=make_match("No redirect filename provided.")):
             parser.parse(_line)
 
     check(line)
@@ -1061,7 +1084,7 @@ def test_empty_redirect_filename(parser: Parser, line: str):
     "cmd < <",
 ))
 def test_empty_redirect_filename_special(parser: Parser, line: str):
-    with pytest.raises(EmptyRedirectParserFailure, match=re.escape("No redirect filename provided.")):
+    with pytest.raises(EmptyRedirectParserFailure, match=make_match("No redirect filename provided.")):
         parser.parse(line)
 
 
