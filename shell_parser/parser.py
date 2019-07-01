@@ -8,18 +8,6 @@ WHITESPACE = frozenset((" ", "\t"))
 NUMBERS = frozenset(("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"))
 
 
-mydebug = None
-def breaker():
-    global mydebug
-    return
-    if mydebug is None:
-        import pdb
-        mydebug = pdb.Pdb()
-        mydebug.rcLines = ['alias stats pp dict(((x, y) for x, y in locals().items() if not isinstance(y, CommandBuilder) and x != "self" and not callable(y)))']
-    if os.environ.get("PYTHONBREAKPOINT", "") != "0":
-        mydebug.set_trace()
-
-
 def isdigit(s: str) -> bool:
     for char in s:
         if char not in NUMBERS:
@@ -28,7 +16,7 @@ def isdigit(s: str) -> bool:
 
 
 class Parser(object):
-    def parse(self, statement: str) -> COMMAND_TYPE:
+    def parse(self, statement: str) -> Command:
         statement = statement.strip()
         statement_len = len(statement)
         if statement_len == 0:
@@ -69,7 +57,6 @@ class Parser(object):
 
         def END_WORD():
             nonlocal cur_word, was_quote_mode, cmd_builder, redirect_mode, current_descriptor, modifying_descriptor
-            breaker()
             if redirect_mode is not None:
                 if not cur_word:
                     raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
@@ -114,7 +101,6 @@ class Parser(object):
 
         def END_STMT():
             nonlocal cmd_builder, prev_cmd_builder, pipe_first_cmd_builder, pipe_prev_cmd_builder
-            breaker()
             if pipe_prev_cmd_builder is not None:
                 pipe_prev_cmd_builder.pipe_command = cmd_builder
                 if prev_cmd_builder:
@@ -131,7 +117,6 @@ class Parser(object):
 
 
         while pos < statement_len:
-            breaker()
             char = statement[pos]
             if just_terminated and char not in WHITESPACE:
                 just_terminated = False

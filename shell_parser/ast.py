@@ -4,9 +4,6 @@ from types import MappingProxyType
 from typing import Collection, Dict, List, Mapping, Optional, Union
 
 
-COMMAND_TYPE = Union['Command', 'NestedCommandList']
-COMMANDBUILDER_TYPE = Union['CommandBuilder', 'NestedCommandListBuilder']
-
 DESCRIPTOR_DEFAULT_INDEX_STDIN = 0
 DESCRIPTOR_DEFAULT_INDEX_STDOUT = 1
 DESCRIPTOR_DEFAULT_INDEX_STDERR = 2
@@ -274,8 +271,8 @@ class Command(object):
     command: Word
     descriptors: CommandDescriptors
     args: Collection[Word] = field(default_factory=tuple)
-    pipe_command: Optional[COMMAND_TYPE] = None
-    next_command: Optional[COMMAND_TYPE] = None
+    pipe_command: Optional['Command'] = None
+    next_command: Optional['Command'] = None
     next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
     asynchronous: bool = False
 
@@ -380,8 +377,8 @@ class InvalidFileDescriptorException(Exception):
 class CommandBuilder(object):
     words: List[Word] = field(default_factory=list)
     descriptors: CommandDescriptorsBuilder = field(default_factory=CommandDescriptorsBuilder)
-    pipe_command: Optional[COMMANDBUILDER_TYPE] = None
-    next_command: Optional[COMMANDBUILDER_TYPE] = None
+    pipe_command: Optional['CommandBuilder'] = None
+    next_command: Optional['CommandBuilder'] = None
     next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
     asynchronous: bool = False
 
@@ -416,21 +413,11 @@ class CommandBuilder(object):
         )
 
 
-@dataclass(frozen=True)
-class NestedCommandList(object):
-    first_command: COMMAND_TYPE
-    pipe_command: Optional[COMMAND_TYPE] = None
-    next_command: Optional[COMMAND_TYPE] = None
-    next_command_operator: Union[None, OperatorAnd, OperatorOr] = None
-    asynchronous: bool = False
-
-
 class CommandBuilderCreateException(Exception):
     pass
 
 
 __all__ = [
-    "COMMAND_TYPE",
     "DESCRIPTOR_DEFAULT_INDEX_STDIN",
     "DESCRIPTOR_DEFAULT_INDEX_STDOUT",
     "DESCRIPTOR_DEFAULT_INDEX_STDERR",
@@ -459,5 +446,4 @@ __all__ = [
     "InvalidFileDescriptorException",
     "CommandBuilder",
     "CommandBuilderCreateException",
-    "NestedCommandList",
 ]
