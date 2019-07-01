@@ -115,12 +115,12 @@ class Parser(object):
         def END_STMT():
             nonlocal cmd_builder, prev_cmd_builder, pipe_first_cmd_builder, pipe_prev_cmd_builder
             breaker()
-            if pipe_prev_cmd_builder:
+            if pipe_prev_cmd_builder is not None:
                 pipe_prev_cmd_builder.pipe_command = cmd_builder
                 if prev_cmd_builder:
                     prev_cmd_builder.next_command = pipe_first_cmd_builder
                 prev_cmd_builder = pipe_first_cmd_builder
-            elif prev_cmd_builder:
+            elif prev_cmd_builder is not None:
                 prev_cmd_builder.next_command = cmd_builder
                 prev_cmd_builder = cmd_builder
             else:
