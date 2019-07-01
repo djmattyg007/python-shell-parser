@@ -171,6 +171,8 @@ def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual:
     ("cmd \t arg1  \t arg2", Word("cmd"), (Word("arg1"), Word("arg2"))),
     ("'cmd' \t arg1\t ' \t  arg2'", Word("cmd"), (Word("arg1"), Word(" \t  arg2"))),
     ("cmd\t1arg\t2arg", Word("cmd"), (Word("1arg"), Word("2arg"))),
+    ("cmd -- --", Word("cmd"), (Word("--"), Word("--"))),
+    ("cmd \\-- -\\- \\-\\- --", Word("cmd"), (Word("--"), Word("--"), Word("--"), Word("--"))),
 ))
 def test_multiple_words(parser: Parser, line: str, command_word: Word, args_words: Tuple[Word, ...]):
     first_cmd = parser.parse(line)
@@ -421,7 +423,7 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str, space_cou
 
         assert str(first_cmd.command) == "cmd1"
         assert str(first_cmd) == expected_str
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(first_cmd, files={1: file_descriptor})
 
     if space_count < 0:
         check(line)
@@ -463,7 +465,7 @@ def test_redirect_append(parser: Parser, line: str, expected_str: str, space_cou
 
         assert str(first_cmd.command) == "cmd1"
         assert str(first_cmd) == expected_str
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(first_cmd, files={1: file_descriptor})
 
     if space_count < 0:
         check(line)
@@ -493,7 +495,7 @@ def test_pipe_and_redirect_output_left_side_only(parser: Parser, formatter: Form
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(first_cmd, files={1: file_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
@@ -538,7 +540,7 @@ def test_pipe_and_redirect_output_right_side_only(parser: Parser, formatter: For
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
         assert_single_cmd(second_cmd)
-        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(second_cmd, files={1: file_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -576,12 +578,12 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file1_descriptor})
+        assert_descriptors(first_cmd, files={1: file1_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
         assert_single_cmd(second_cmd)
-        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file2_descriptor})
+        assert_descriptors(second_cmd, files={1: file2_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -616,7 +618,7 @@ def test_pipe_and_redirect_append_left_side_only(parser: Parser, formatter: Form
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(first_cmd, files={1: file_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
@@ -661,7 +663,7 @@ def test_pipe_and_redirect_append_right_side_only(parser: Parser, formatter: For
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
         assert_single_cmd(second_cmd)
-        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file_descriptor})
+        assert_descriptors(second_cmd, files={1: file_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -699,12 +701,12 @@ def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatte
 
         assert str(first_cmd.command) == "cmd1"
         assert isinstance(first_cmd.pipe_command, Command)
-        assert_descriptors(first_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file1_descriptor})
+        assert_descriptors(first_cmd, files={1: file1_descriptor})
 
         second_cmd = first_cmd.pipe_command
         assert str(second_cmd.command).strip() == "cmd2"
         assert_single_cmd(second_cmd)
-        assert_descriptors(second_cmd, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: file2_descriptor})
+        assert_descriptors(second_cmd, files={1: file2_descriptor})
 
     if pipe_space_count < 0:
         check(line)
@@ -725,32 +727,32 @@ def test_duplicating_descriptors(parser: Parser):
     stmt1 = "cmd arg1 >&2"
     cmd1 = parser.parse(stmt1)
     assert_single_cmd(cmd1)
-    assert_descriptors(cmd1, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: DEFAULT_DESCRIPTOR_STDERR})
+    assert_descriptors(cmd1, files={1: DEFAULT_DESCRIPTOR_STDERR})
     assert str(cmd1) == "cmd arg1 > /dev/stderr"
 
     stmt2 = "cmd arg1 >&2 2>&-"
     cmd2 = parser.parse(stmt2)
     assert_single_cmd(cmd2)
-    assert_descriptors(cmd2, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: DEFAULT_DESCRIPTOR_STDERR}, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
+    assert_descriptors(cmd2, files={1: DEFAULT_DESCRIPTOR_STDERR}, closed=frozenset((2,)))
     assert str(cmd2) == "cmd arg1 > /dev/stderr 2>&-"
 
     stmt3 = "cmd 'arg1 arg2'2>&-"
     cmd3 = parser.parse(stmt3)
     assert_single_cmd(cmd3)
-    assert_descriptors(cmd3, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDOUT,)))
+    assert_descriptors(cmd3, closed=frozenset((1,)))
     assert str(cmd3) == "cmd 'arg1 arg22' >&-"
 
     stmt4 = "cmd arg1 2>&1"
     cmd4 = parser.parse(stmt4)
     assert_single_cmd(cmd4)
-    assert_descriptors(cmd4, files={DESCRIPTOR_DEFAULT_INDEX_STDERR: DEFAULT_DESCRIPTOR_STDOUT})
+    assert_descriptors(cmd4, files={2: DEFAULT_DESCRIPTOR_STDOUT})
     assert str(cmd4) == "cmd arg1 2> /dev/stdout"
 
     stmt5 = "cmd arg1 22>&2 >33 44>&22"
     cmd5 = parser.parse(stmt5)
     assert_single_cmd(cmd5)
     cmd5_files = {
-        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="33"), RedirectionOutput()),
+        1: make_descriptor(File(name="33"), RedirectionOutput()),
         22: DEFAULT_DESCRIPTOR_STDERR,
         44: DEFAULT_DESCRIPTOR_STDERR,
     }
@@ -761,11 +763,11 @@ def test_duplicating_descriptors(parser: Parser):
     cmd6 = parser.parse(stmt6)
     assert_single_cmd(cmd6)
     cmd6_files = {
-        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="44"), RedirectionOutput()),
+        1: make_descriptor(File(name="44"), RedirectionOutput()),
         22: DEFAULT_DESCRIPTOR_STDERR,
         44: DEFAULT_DESCRIPTOR_STDERR,
     }
-    assert_descriptors(cmd6, files=cmd6_files, closed=frozenset((DESCRIPTOR_DEFAULT_INDEX_STDERR,)))
+    assert_descriptors(cmd6, files=cmd6_files, closed=frozenset((2,)))
     assert str(cmd6) == "cmd arg1 > 44 2>&- 22> /dev/stderr 44> /dev/stderr"
 
 
@@ -799,6 +801,7 @@ def test_closing_descriptors(parser: Parser, line: str, descriptors: Set[int], e
     "cmd >&a1",
     "cmd >&1a1",
     "cmd >&a1a",
+    "cmd >&\\--",
 ))
 def test_ambiguous_descriptor_redirects(parser: Parser, line: str):
     def check(_line: str):
@@ -825,15 +828,15 @@ def test_unusual_descriptor_redirects(parser: Parser):
     stmt2 = "cmd2 2>test2.txt 2>&2"
     cmd2 = parser.parse(stmt2)
     assert_single_cmd(cmd2)
-    assert_descriptors(cmd2, files={DESCRIPTOR_DEFAULT_INDEX_STDERR: make_descriptor(File(name="test2.txt"), RedirectionOutput())})
+    assert_descriptors(cmd2, files={2: make_descriptor(File(name="test2.txt"), RedirectionOutput())})
     assert str(cmd2) == "cmd2 2> test2.txt"
 
     stmt3 = "cmd3 2>test3.txt2>&2"
     cmd3 = parser.parse(stmt3)
     assert_single_cmd(cmd3)
     cmd3_files = {
-        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
-        DESCRIPTOR_DEFAULT_INDEX_STDERR: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
+        1: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
+        2: make_descriptor(File(name="test3.txt2"), RedirectionOutput()),
     }
     assert_descriptors(cmd3, files=cmd3_files)
     assert str(cmd3) == "cmd3 > test3.txt2 2> test3.txt2"
@@ -842,7 +845,7 @@ def test_unusual_descriptor_redirects(parser: Parser):
     cmd4 = parser.parse(stmt4)
     assert_single_cmd(cmd4)
     cmd4_files = {
-        DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(DefaultFile(target=StderrTarget()), RedirectionOutput()),
+        1: make_descriptor(DefaultFile(target=StderrTarget()), RedirectionOutput()),
     }
     assert_descriptors(cmd4, files=cmd4_files)
     assert str(cmd4) == "cmd4 2 > /dev/stderr"
@@ -850,13 +853,13 @@ def test_unusual_descriptor_redirects(parser: Parser):
     stmt5 = "cmd5 0> test5.txt"
     cmd5 = parser.parse(stmt5)
     assert_single_cmd(cmd5)
-    assert_descriptors(cmd5, files={DESCRIPTOR_DEFAULT_INDEX_STDIN: make_descriptor(File(name="test5.txt"), RedirectionOutput())})
+    assert_descriptors(cmd5, files={0: make_descriptor(File(name="test5.txt"), RedirectionOutput())})
     assert str(cmd5) == "cmd5 0> test5.txt"
 
     stmt6 = "cmd6 1< test6.txt"
     cmd6 = parser.parse(stmt6)
     assert_single_cmd(cmd6)
-    assert_descriptors(cmd6, files={DESCRIPTOR_DEFAULT_INDEX_STDOUT: make_descriptor(File(name="test6.txt"), RedirectionInput())})
+    assert_descriptors(cmd6, files={1: make_descriptor(File(name="test6.txt"), RedirectionInput())})
     assert str(cmd6) == "cmd6 1< test6.txt"
 
     stmt7 = "cmd7 22<&0"
@@ -865,6 +868,76 @@ def test_unusual_descriptor_redirects(parser: Parser):
     assert_descriptors(cmd7, files={22: make_descriptor(DefaultFile(target=StdinTarget()), RedirectionInput())})
     assert str(cmd7) == "cmd7 22< /dev/stdin"
 
+    stmt8 = "cmd8 2>\\-test8.txt"
+    cmd8 = parser.parse(stmt8)
+    assert_single_cmd(cmd8)
+    assert_descriptors(cmd8, files={2: make_descriptor(File(name="-test8.txt"), RedirectionOutput())})
+    assert str(cmd8) == "cmd8 2> -test8.txt"
+
+
+@pytest.mark.parametrize("line,fd", (
+    ("cmd > test.txt", 1),
+    ("cmd 0> test.txt", 0),
+    ("cmd 1> test.txt", 1),
+    ("cmd 2> test.txt", 2),
+    ("cmd 3> test.txt", 3),
+    ("cmd 4> test.txt", 4),
+    ("cmd 5> test.txt", 5),
+    ("cmd 6> test.txt", 6),
+    ("cmd 7> test.txt", 7),
+    ("cmd 8> test.txt", 8),
+    ("cmd 9> test.txt", 9),
+))
+def test_every_descriptor_starting_digit_redirect_output(parser: Parser, line: str, fd: int):
+    file_descriptor = make_descriptor(File(name="test.txt"), RedirectionOutput())
+    first_cmd = parser.parse(line)
+    assert first_cmd.command == Word("cmd")
+    assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd, files={fd: file_descriptor})
+
+
+@pytest.mark.parametrize("line,fd", (
+    ("cmd >> test.txt", 1),
+    ("cmd 0>> test.txt", 0),
+    ("cmd 1>> test.txt", 1),
+    ("cmd 2>> test.txt", 2),
+    ("cmd 3>> test.txt", 3),
+    ("cmd 4>> test.txt", 4),
+    ("cmd 5>> test.txt", 5),
+    ("cmd 6>> test.txt", 6),
+    ("cmd 7>> test.txt", 7),
+    ("cmd 8>> test.txt", 8),
+    ("cmd 9>> test.txt", 9),
+))
+def test_every_descriptor_starting_digit_redirect_append(parser: Parser, line: str, fd: int):
+    file_descriptor = make_descriptor(File(name="test.txt"), RedirectionAppend())
+    first_cmd = parser.parse(line)
+    assert first_cmd.command == Word("cmd")
+    assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd, files={fd: file_descriptor})
+
+
+@pytest.mark.parametrize("line,fd", (
+    ("cmd < test.txt", 0),
+    ("cmd 0< test.txt", 0),
+    ("cmd 1< test.txt", 1),
+    ("cmd 2< test.txt", 2),
+    ("cmd 3< test.txt", 3),
+    ("cmd 4< test.txt", 4),
+    ("cmd 5< test.txt", 5),
+    ("cmd 6< test.txt", 6),
+    ("cmd 7< test.txt", 7),
+    ("cmd 8< test.txt", 8),
+    ("cmd 9< test.txt", 9),
+))
+def test_every_descriptor_starting_digit_redirect_input(parser: Parser, line: str, fd: int):
+    file_descriptor = make_descriptor(File(name="test.txt"), RedirectionInput())
+    first_cmd = parser.parse(line)
+    assert first_cmd.command == Word("cmd")
+    assert_single_cmd(first_cmd)
+    assert_descriptors(first_cmd, files={fd: file_descriptor})
+
+
 @pytest.mark.parametrize("line", (
     "cmd >>&a",
     "cmd >>&1a",
@@ -872,7 +945,7 @@ def test_unusual_descriptor_redirects(parser: Parser):
     "cmd >>&1a1",
     "cmd >>&a1a",
 ))
-def test_invalid_redirections(parser: Parser, line: str):
+def test_invalid_descriptor_duplications(parser: Parser, line: str):
     def check(_line: str):
         with pytest.raises(InvalidRedirectionParserFailure):
             parser.parse(_line)
@@ -885,6 +958,18 @@ def test_invalid_redirections(parser: Parser, line: str):
 
     check(line)
     check(line.replace(">>", "2>>"))
+
+
+@pytest.mark.parametrize("line", (
+    "cmd >&- 2>&1",
+    "cmd 2>&- 1>&2",
+    "cmd 2>&- 3>&- 4>&2",
+    "cmd 3>&- 4>&3",
+    "cmd 4>&3",
+))
+def test_bad_descriptor_duplications(parser: Parser, line: str):
+    with pytest.raises(BadFileDescriptorException):
+        parser.parse(line)
 
 
 @pytest.mark.parametrize("pipe_space_count", range(-1, 4))
@@ -1094,7 +1179,7 @@ def test_empty_redirect_filename_special(parser: Parser, line: str):
     "cmd1 |",
     "cmd1 >&",
 ))
-def test_unexpected_statementfinish(parser: Parser, line: str):
+def test_unexpected_statement_finish(parser: Parser, line: str):
     with pytest.raises(UnexpectedStatementFinishParserFailure):
         parser.parse(line)
 

@@ -346,11 +346,10 @@ class CommandDescriptorsBuilder(object):
         success = False
         try:
             src_descriptor = self.descriptors[src_fd].duplicate()
-            # TODO: Add test attempting to duplicate a closed descriptor
             if isinstance(src_descriptor, CommandDescriptor):
                 self.descriptors[dest_fd] = src_descriptor
                 success = True
-        except IndexError:
+        except KeyError:
             pass
 
         if not success:

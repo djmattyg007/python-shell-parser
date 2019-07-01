@@ -71,6 +71,9 @@ def test_closed_descriptor():
     # just returns the original object.
     assert duplicated_test_closed is test_closed
 
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        test_closed.newattr = "newattr"
+
 
 def test_descriptor_container():
     with pytest.raises(InvalidFileDescriptorException, match=make_match("File descriptors must be integers")):

@@ -57,9 +57,9 @@ def test_default_file():
     test_stdin_file = DefaultFile(target=StdinTarget())
     assert repr(test_stdin_file) == "<DefaultFile target=stdin>"
     assert str(test_stdin_file) == "stdin"
-    assert test_stdin_file.is_stdin
-    assert not test_stdin_file.is_stdout
-    assert not test_stdin_file.is_stderr
+    assert test_stdin_file.is_stdin == True
+    assert test_stdin_file.is_stdout == False
+    assert test_stdin_file.is_stderr == False
 
     with pytest.raises(FrozenInstanceError):
         test_stdin_file.target = StdoutTarget()
@@ -67,9 +67,9 @@ def test_default_file():
     test_stdout_file = DefaultFile(target=StdoutTarget())
     assert repr(test_stdout_file) == "<DefaultFile target=stdout>"
     assert str(test_stdout_file) == "stdout"
-    assert not test_stdout_file.is_stdin
-    assert test_stdout_file.is_stdout
-    assert not test_stdout_file.is_stderr
+    assert test_stdout_file.is_stdin == False
+    assert test_stdout_file.is_stdout == True
+    assert test_stdout_file.is_stderr == False
 
     with pytest.raises(FrozenInstanceError):
         test_stdout_file.target = StderrTarget()
@@ -77,9 +77,9 @@ def test_default_file():
     test_stderr_file = DefaultFile(target=StderrTarget())
     assert repr(test_stderr_file) == "<DefaultFile target=stderr>"
     assert str(test_stderr_file) == "stderr"
-    assert not test_stderr_file.is_stdin
-    assert not test_stderr_file.is_stdout
-    assert test_stderr_file.is_stderr
+    assert test_stderr_file.is_stdin == False
+    assert test_stderr_file.is_stdout == False
+    assert test_stderr_file.is_stderr == True
 
     with pytest.raises(FrozenInstanceError):
         test_stderr_file.target = StdinTarget()
@@ -128,3 +128,17 @@ def test_operator_or():
 
     with pytest.raises(FrozenInstanceError):
         test_operator.newattr = "newattr"
+
+
+def test_descriptor_mode_read():
+    test_mode = DescriptorRead()
+
+    with pytest.raises(FrozenInstanceError):
+        test_mode.newattr = "newattr"
+
+
+def test_descriptor_mode_write():
+    test_mode = DescriptorWrite()
+
+    with pytest.raises(FrozenInstanceError):
+        test_mode.newattr = "newattr"
