@@ -49,6 +49,36 @@ def test_default_init():
     assert stderr.descriptor.target.is_stderr == True
 
 
+@pytest.mark.parametrize("fds", (
+    frozenset((0,)),
+    frozenset((1,)),
+    frozenset((2,)),
+    frozenset((0, 1)),
+    frozenset((0, 2)),
+    frozenset((1, 2)),
+    frozenset((0, 1, 2)),
+))
+def test_custom_init(fds):
+    descriptors = dict()
+    for fd in fds:
+        descriptors[fd] = CommandDescriptor(
+            mode=DescriptorWrite(),
+            descriptor=CommandFileDescriptor(
+                target=File("test{0}.txt".format(fd)),
+                operator=RedirectionOutput(),
+            )
+        )
+
+    builder = CommandDescriptorsBuilder(descriptors=descriptors)
+    for fd in fds:
+        assert builder.descriptors[fd].descriptor.is_default_file == False
+        assert builder.descriptors[fd].descriptor.target.name == "test{0}.txt".format(fd)
+
+    default_fds = DEFAULT_DESCRIPTOR_FDS - fds
+    for fd in default_fds:
+        assert builder.descriptors[fd].descriptor.is_default_file == True
+
+
 def test_default_create():
     builder = CommandDescriptorsBuilder()
     descriptor_container = builder.create()
