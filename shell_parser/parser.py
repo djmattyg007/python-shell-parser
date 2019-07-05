@@ -238,14 +238,14 @@ class Parser(object):
 
                     next_char = NEXT_CHAR()
                     if next_char == "&":
-                        cmd_builder.next_command_operator = OperatorAnd()
+                        pipe_first_cmd_builder.next_command_operator = OperatorAnd()
                         pos += 1
                         expecting_new_statement = True
                     else:
                         cmd_builder.asynchronous = True
 
-                    just_terminated = True
                     END_STMT()
+                    just_terminated = True
 
             elif char == "|":
                 if prev_char == "\\":
@@ -258,11 +258,11 @@ class Parser(object):
 
                     next_char = NEXT_CHAR()
                     if next_char == "|":
-                        cmd_builder.next_command_operator = OperatorOr()
+                        pipe_first_cmd_builder.next_command_operator = OperatorOr()
                         pos += 1
+                        END_STMT()
                         just_terminated = True
                         expecting_new_statement = True
-                        END_STMT()
                     else:
                         if pipe_prev_cmd_builder:
                             pipe_prev_cmd_builder.pipe_command = cmd_builder

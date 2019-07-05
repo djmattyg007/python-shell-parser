@@ -1136,6 +1136,76 @@ def test_mixed_next_cmd_operators(parser: Parser, formatter: Formatter, line: st
     assert cmd_count == expected_cmd_count
 
 
+def test_mixed_next_cmd_operators_with_pipes1(parser: Parser, formatter: Formatter):
+    first_cmd = parser.parse("cmd1 | cmd2 && cmd3 || cmd4")
+    assert first_cmd.command == Word("cmd1")
+    assert first_cmd.args == tuple()
+    assert_descriptors(first_cmd)
+
+    first_cmd_pipe_cmd1 = first_cmd.pipe_command
+    assert first_cmd_pipe_cmd1.command == Word("cmd2")
+    assert first_cmd_pipe_cmd1.args == tuple()
+    assert_descriptors(first_cmd_pipe_cmd1)
+    assert_single_cmd(first_cmd_pipe_cmd1)
+
+    assert isinstance(first_cmd.next_command_operator, OperatorAnd)
+    second_cmd = first_cmd.next_command
+    assert second_cmd.command == Word("cmd3")
+    assert second_cmd.args == tuple()
+    assert_descriptors(second_cmd)
+
+    assert isinstance(second_cmd.next_command_operator, OperatorOr)
+    third_cmd = second_cmd.next_command
+    assert third_cmd.command == Word("cmd4")
+    assert third_cmd.args == tuple()
+    assert_descriptors(third_cmd)
+    assert_single_cmd(third_cmd)
+
+
+def test_mixed_next_cmd_operators_with_pipes2(parser: Parser, formatter: Formatter):
+    first_cmd = parser.parse("cmd1 arg1 | cmd2 arg2 arg3 | cmd3 && cmd4; cmd5 || cmd6 arg4 | cmd7")
+    assert first_cmd.command == Word("cmd1")
+    assert first_cmd.args == (Word("arg1"),)
+    assert_descriptors(first_cmd)
+
+    first_cmd_pipe_cmd1 = first_cmd.pipe_command
+    assert first_cmd_pipe_cmd1.command == Word("cmd2")
+    assert first_cmd_pipe_cmd1.args == (Word("arg2"), Word("arg3"))
+    assert_descriptors(first_cmd_pipe_cmd1)
+
+    first_cmd_pipe_cmd2 = first_cmd_pipe_cmd1.pipe_command
+    assert first_cmd_pipe_cmd2.command == Word("cmd3")
+    assert first_cmd_pipe_cmd2.args == tuple()
+    assert_descriptors(first_cmd_pipe_cmd2)
+    assert_single_cmd(first_cmd_pipe_cmd2)
+
+    assert isinstance(first_cmd.next_command_operator, OperatorAnd)
+    second_cmd = first_cmd.next_command
+    assert second_cmd.command == Word("cmd4")
+    assert second_cmd.args == tuple()
+    assert_descriptors(second_cmd)
+
+    assert second_cmd.next_command_operator is None
+    third_cmd = second_cmd.next_command
+    assert third_cmd.command == Word("cmd5")
+    assert third_cmd.args == tuple()
+    assert_descriptors(third_cmd)
+
+    assert isinstance(third_cmd.next_command_operator, OperatorOr)
+    fourth_cmd = third_cmd.next_command
+    assert fourth_cmd.command == Word("cmd6")
+    assert fourth_cmd.args == (Word("arg4"),)
+    assert_descriptors(fourth_cmd)
+    assert fourth_cmd.next_command is None
+    assert fourth_cmd.next_command_operator is None
+
+    fourth_cmd_pipe_cmd1 = fourth_cmd.pipe_command
+    assert fourth_cmd_pipe_cmd1.command == Word("cmd7")
+    assert fourth_cmd_pipe_cmd1.args == tuple()
+    assert_descriptors(fourth_cmd_pipe_cmd1)
+    assert_single_cmd(fourth_cmd_pipe_cmd1)
+
+
 @pytest.mark.parametrize("line", (
     "cmd1 >;",
     "cmd1 > ;",
