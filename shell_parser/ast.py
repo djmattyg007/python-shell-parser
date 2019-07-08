@@ -19,7 +19,7 @@ class Word(object):
     def __repr__(self):
         return "<{0} word={1}>".format(
             self.__class__.__name__,
-            self.word
+            self.word,
         )
 
 
@@ -33,7 +33,7 @@ class File(object):
     def __repr__(self):
         return "<{0} name={1}>".format(
             self.__class__.__name__,
-            self.name
+            self.name,
         )
 
     def duplicate(self) -> 'File':
@@ -310,8 +310,8 @@ class CommandDescriptorsBuilder(object):
                 mode=DescriptorRead(),
                 descriptor=CommandFileDescriptor(
                     target=DefaultFile(target=StdinTarget()),
-                    operator=RedirectionInput()
-                )
+                    operator=RedirectionInput(),
+                ),
             )
 
         if DESCRIPTOR_DEFAULT_INDEX_STDOUT not in self.descriptors:
@@ -319,8 +319,8 @@ class CommandDescriptorsBuilder(object):
                 mode=DescriptorWrite(),
                 descriptor=CommandFileDescriptor(
                     target=DefaultFile(target=StdoutTarget()),
-                    operator=RedirectionOutput()
-                )
+                    operator=RedirectionOutput(),
+                ),
             )
 
         if DESCRIPTOR_DEFAULT_INDEX_STDERR not in self.descriptors:
@@ -328,8 +328,8 @@ class CommandDescriptorsBuilder(object):
                 mode=DescriptorWrite(),
                 descriptor=CommandFileDescriptor(
                     target=DefaultFile(target=StderrTarget()),
-                    operator=RedirectionOutput()
-                )
+                    operator=RedirectionOutput(),
+                ),
             )
 
     def set_descriptor(self, fd: int, descriptor: CommandDescriptor):
@@ -383,6 +383,7 @@ class CommandBuilder(object):
     asynchronous: bool = False
 
     def create(self) -> Command:
+        args: Collection[Word]
         if len(self.words) == 0:
             raise CommandBuilderCreateException("No command words added.")
         elif len(self.words) == 1:
@@ -392,11 +393,13 @@ class CommandBuilder(object):
             command = self.words[0]
             args = tuple(self.words[1:])
 
+        pipe_command: Optional[Command]
         if self.pipe_command:
             pipe_command = self.pipe_command.create()
         else:
             pipe_command = None
 
+        next_command: Optional[Command]
         if self.next_command:
             next_command = self.next_command.create()
         else:

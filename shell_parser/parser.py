@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from .ast import *
@@ -27,17 +26,17 @@ class Parser(object):
 
         cmd_builder = CommandBuilder()
         first_cmd_builder: CommandBuilder = cmd_builder
-        prev_cmd_builder: CommandBuilder = None
+        prev_cmd_builder: Optional[CommandBuilder] = None
         pipe_first_cmd_builder: CommandBuilder = cmd_builder
-        pipe_prev_cmd_builder: CommandBuilder = None
+        pipe_prev_cmd_builder: Optional[CommandBuilder] = None
 
-        prev_char: str = None
-        quote_mode: str = None
+        prev_char: Optional[str] = None
+        quote_mode: Optional[str] = None
         was_quote_mode = False
-        redirect_mode: str = None
+        redirect_mode: Optional[str] = None
         just_terminated = False
         expecting_new_statement = False
-        current_descriptor: int = None
+        current_descriptor: Optional[int] = None
         modifying_descriptor = False
 
         def WRITE_CHAR(char: str):
@@ -82,7 +81,7 @@ class Parser(object):
                         descriptor=CommandFileDescriptor(
                             target=File(cur_word),
                             operator=redirect_operator,
-                        )
+                        ),
                     )
                     cmd_builder.descriptors.set_descriptor(current_descriptor, descriptor)
 
@@ -115,7 +114,6 @@ class Parser(object):
             pipe_first_cmd_builder = cmd_builder
             pipe_prev_cmd_builder = None
 
-
         while pos < statement_len:
             char = statement[pos]
             if just_terminated and char not in WHITESPACE:
@@ -125,7 +123,7 @@ class Parser(object):
             if quote_mode == '"':
                 if char == '"':
                     if prev_char == "\\":
-                        cur_word += char
+                        WRITE_CHAR(char)
                     else:
                         quote_mode = None
                 elif char == "\\":
@@ -133,8 +131,8 @@ class Parser(object):
                 else:
                     if prev_char == "\\":
                         if char not in ("\\", "$"):
-                            cur_word += prev_char
-                    cur_word += char
+                            WRITE_CHAR(prev_char)
+                    WRITE_CHAR(char)
                 prev_char = char
                 pos += 1
                 continue
@@ -142,11 +140,10 @@ class Parser(object):
                 if char == "'":
                     quote_mode = None
                 else:
-                    cur_word += char
+                    WRITE_CHAR(char)
                 prev_char = char
                 pos += 1
                 continue
-
 
             if char == '"' or char == "'":
                 if prev_char == "\\":
@@ -164,7 +161,10 @@ class Parser(object):
                     WRITE_CHAR(char)
                 else:
                     if len(cmd_builder.words) == 0 and not cur_word:
-                        raise EmptyStatementParserFailure("Statement terminator found without any preceding statement.", pos=pos)
+                        raise EmptyStatementParserFailure(
+                            "Statement terminator found without any preceding statement.",
+                            pos=pos,
+                        )
 
                     END_WORD()
                     END_CMDARGS()
@@ -191,7 +191,10 @@ class Parser(object):
                         pos += 1
                         next_char = NEXT_CHAR()
                         if next_char == "&":
-                            raise InvalidRedirectionParserFailure("Cannot duplicate descriptor with append operator.", pos=pos)
+                            raise InvalidRedirectionParserFailure(
+                                "Cannot duplicate descriptor with append operator.",
+                                pos=pos,
+                            )
                     else:
                         redirect_mode = ">"
                         if next_char == "&":

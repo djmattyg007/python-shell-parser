@@ -3,12 +3,12 @@ import importlib
 import sys
 
 import shell_parser.ast as ast
-import shell_parser.parser as parser
 import shell_parser.formatter as formatter
+import shell_parser.parser as parser
 
 try:
     import readline
-except:
+except ImportError:
     pass
 
 while True:
