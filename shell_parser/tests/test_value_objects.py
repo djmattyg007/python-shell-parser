@@ -1,9 +1,11 @@
 import pytest
 
 from dataclasses import FrozenInstanceError
-from typing import Union
 
-from shell_parser.ast import *
+from shell_parser.ast import DefaultFile, File, Word
+from shell_parser.ast import StdinTarget, StdoutTarget, StderrTarget
+from shell_parser.ast import RedirectionInput, RedirectionOutput, RedirectionAppend
+from shell_parser.ast import OperatorAnd, OperatorOr, DescriptorRead, DescriptorWrite
 
 
 def test_word():

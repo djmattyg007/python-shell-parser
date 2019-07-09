@@ -1,6 +1,9 @@
 from typing import Optional
 
-from .ast import *
+from .ast import Word, File
+from .ast import RedirectionInput, RedirectionOutput, RedirectionAppend, OperatorAnd, OperatorOr
+from .ast import DescriptorRead, DescriptorWrite, CommandFileDescriptor, CommandDescriptor
+from .ast import Command, CommandBuilder
 
 
 WHITESPACE = frozenset((" ", "\t"))

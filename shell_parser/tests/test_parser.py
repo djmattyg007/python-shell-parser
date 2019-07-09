@@ -1,12 +1,17 @@
 import pytest
 
-import dataclasses
 import re
-
-from shell_parser.ast import *
-from shell_parser.formatter import Formatter
-from shell_parser.parser import *
 from typing import AbstractSet, Mapping, Tuple, Union
+
+from shell_parser.ast import Word, File, StdinTarget, StdoutTarget, StderrTarget, DefaultFile
+from shell_parser.ast import RedirectionInput, RedirectionOutput, RedirectionAppend, OperatorAnd, OperatorOr
+from shell_parser.ast import DescriptorRead, DescriptorWrite, CommandDescriptorClosed, CommandFileDescriptor, CommandDescriptor
+from shell_parser.ast import Command
+from shell_parser.ast import BadFileDescriptorException
+from shell_parser.formatter import Formatter
+from shell_parser.parser import Parser, EmptyInputException
+from shell_parser.parser import UnclosedQuoteParserFailure, EmptyStatementParserFailure, EmptyRedirectParserFailure
+from shell_parser.parser import UnexpectedStatementFinishParserFailure, InvalidRedirectionParserFailure, AmbiguousRedirectParserFailure
 
 
 def make_match(msg: str) -> str:

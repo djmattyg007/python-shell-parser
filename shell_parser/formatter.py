@@ -1,6 +1,6 @@
 from typing import Optional, Sequence
 
-from .ast import *
+from .ast import Command
 
 
 class Formatter(object):

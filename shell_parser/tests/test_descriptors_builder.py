@@ -6,7 +6,9 @@ import re
 from shell_parser.ast import CommandDescriptorsBuilder, CommandDescriptor, CommandFileDescriptor, File
 from shell_parser.ast import RedirectionOutput, DescriptorWrite
 from shell_parser.ast import BadFileDescriptorException, InvalidFileDescriptorException
-from shell_parser.ast import DESCRIPTOR_DEFAULT_INDEX_STDIN, DESCRIPTOR_DEFAULT_INDEX_STDOUT, DESCRIPTOR_DEFAULT_INDEX_STDERR
+from shell_parser.ast import (
+    DESCRIPTOR_DEFAULT_INDEX_STDIN, DESCRIPTOR_DEFAULT_INDEX_STDOUT, DESCRIPTOR_DEFAULT_INDEX_STDERR
+)
 
 
 DEFAULT_DESCRIPTOR_FDS = frozenset((
