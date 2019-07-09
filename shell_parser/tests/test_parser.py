@@ -421,10 +421,11 @@ def test_pipe_commands(parser: Parser, formatter: Formatter, line: str, expected
     ("cmd1 'arg1 arg2'>testfile.txt arg3", "cmd1 'arg1 arg2' arg3 > testfile.txt"),
     ("cmd1 'arg1 arg2'xx>testfile.txt arg3", "cmd1 'arg1 arg2xx' arg3 > testfile.txt"),
     ("cmd1 'arg1 arg2'3>testfile.txt arg3", "cmd1 'arg1 arg23' arg3 > testfile.txt"),
+    ("cmd1 arg1\\>>testfile.txt", "cmd1 'arg1>' > testfile.txt"),
 ))
 def test_redirect_output(parser: Parser, line: str, expected_str: str, space_count: int):
-    # todo add escaped appends
     file_descriptor = make_descriptor(File("testfile.txt"), RedirectionOutput())
+
     def check(_line: str):
         first_cmd = parser.parse(_line)
         assert_single_cmd(first_cmd)
@@ -463,10 +464,12 @@ def test_redirect_output(parser: Parser, line: str, expected_str: str, space_cou
     ("cmd1 'arg1 arg2'>>testfile.txt arg3", "cmd1 'arg1 arg2' arg3 >> testfile.txt"),
     ("cmd1 'arg1 arg2'xx>>testfile.txt arg3", "cmd1 'arg1 arg2xx' arg3 >> testfile.txt"),
     ("cmd1 'arg1 arg2'3>>testfile.txt arg3", "cmd1 'arg1 arg23' arg3 >> testfile.txt"),
+    ("cmd1 arg1\\> >>testfile.txt", "cmd1 'arg1>' >> testfile.txt"),
+    ("cmd1 arg1\\>\\> >> testfile.txt", "cmd1 'arg1>>' >> testfile.txt"),
 ))
 def test_redirect_append(parser: Parser, line: str, expected_str: str, space_count: int):
-    # todo add escaped outputs 
     file_descriptor = make_descriptor(File("testfile.txt"), RedirectionAppend())
+
     def check(_line: str):
         first_cmd = parser.parse(line)
         assert_single_cmd(first_cmd)
