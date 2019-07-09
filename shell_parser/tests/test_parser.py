@@ -26,7 +26,7 @@ def assert_single_cmd(cmd: Command):
 
 def make_descriptor(
         target: Union[File, DefaultFile],
-        operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]
+        operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend],
     ) -> CommandDescriptor:
     file_descriptor = CommandFileDescriptor(
         target=target,
@@ -54,7 +54,7 @@ def assert_descriptors(
         *,
         defaults: AbstractSet[int] = frozenset((0, 1, 2)),
         files: Mapping[int, CommandDescriptor] = None,
-        closed: AbstractSet[int] = frozenset()
+        closed: AbstractSet[int] = frozenset(),
     ):
     descriptors = cmd.descriptors.descriptors
     checked_fds = set()
@@ -64,7 +64,7 @@ def assert_descriptors(
         not_set_defaults -= files.keys()
 
     for default_fd in not_set_defaults:
-        assert descriptors[default_fd].descriptor.is_default_file == True
+        assert descriptors[default_fd].descriptor.is_default_file is True
         checked_fds.add(default_fd)
 
     if files is not None:
@@ -131,7 +131,7 @@ def test_single_word(parser: Parser, line: str, expected_str: Word):
     assert first_cmd.command == expected_str
     assert len(first_cmd.args) == 0
     assert_single_cmd(first_cmd)
-    assert first_cmd.asynchronous == False
+    assert first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("space_char", (" ", "\t"))
@@ -159,7 +159,7 @@ def test_single_word_manually_terminated(parser: Parser, manual: str, nonmanual:
     nonmanual_first_cmd = parser.parse(nonmanual)
     assert manual_first_cmd == nonmanual_first_cmd
     assert_single_cmd(manual_first_cmd)
-    assert manual_first_cmd.asynchronous == False
+    assert manual_first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("line,command_word,args_words", (
@@ -266,7 +266,7 @@ def test_escaping_outside_quotes(parser: Parser, line: str, expected_str: str):
         first_cmd = parser.parse(_line)
         assert str(first_cmd) == expected_str
         assert_single_cmd(first_cmd)
-        assert first_cmd.asynchronous == False
+        assert first_cmd.asynchronous is False
 
     check(line)
     check(line + ";")
@@ -285,7 +285,7 @@ def test_escaping_inside_single_quotes(parser: Parser, line: str, expected_str: 
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
     assert_single_cmd(first_cmd)
-    assert first_cmd.asynchronous == False
+    assert first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("line,expected_str", (
@@ -298,7 +298,7 @@ def test_escaping_inside_double_quotes(parser: Parser, line: str, expected_str: 
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
     assert_single_cmd(first_cmd)
-    assert first_cmd.asynchronous == False
+    assert first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("line,expected_str", (
@@ -311,7 +311,7 @@ def test_mixing_quotes(parser: Parser, line: str, expected_str: str):
     first_cmd = parser.parse(line)
     assert str(first_cmd) == expected_str
     assert_single_cmd(first_cmd)
-    assert first_cmd.asynchronous == False
+    assert first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("line", (
@@ -331,7 +331,7 @@ def test_empty_string_args(parser: Parser, line: str):
     assert str(first_cmd) == "cmd1 ''"
     assert_single_cmd(first_cmd)
     assert_descriptors(first_cmd)
-    assert first_cmd.asynchronous == False
+    assert first_cmd.asynchronous is False
 
 
 @pytest.mark.parametrize("line,expected_cmd_count,expected_strs", (
@@ -495,6 +495,7 @@ def test_redirect_append(parser: Parser, line: str, expected_str: str, space_cou
 ))
 def test_pipe_and_redirect_output_left_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file1.txt"), RedirectionOutput())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -535,6 +536,7 @@ def test_pipe_and_redirect_output_left_side_only(parser: Parser, formatter: Form
 ))
 def test_pipe_and_redirect_output_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file2.txt"), RedirectionOutput())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -578,6 +580,7 @@ def test_pipe_and_redirect_output_right_side_only(parser: Parser, formatter: For
 def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file1_descriptor = make_descriptor(File("file1.txt"), RedirectionOutput())
     file2_descriptor = make_descriptor(File("file2.txt"), RedirectionOutput())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -618,6 +621,7 @@ def test_pipe_and_redirect_output_both_sides(parser: Parser, formatter: Formatte
 ))
 def test_pipe_and_redirect_append_left_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file1.txt"), RedirectionAppend())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -658,6 +662,7 @@ def test_pipe_and_redirect_append_left_side_only(parser: Parser, formatter: Form
 ))
 def test_pipe_and_redirect_append_right_side_only(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file_descriptor = make_descriptor(File("file2.txt"), RedirectionAppend())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -701,6 +706,7 @@ def test_pipe_and_redirect_append_right_side_only(parser: Parser, formatter: For
 def test_pipe_and_redirect_append_both_sides(parser: Parser, formatter: Formatter, line: str, expected_str: str, pipe_space_count: int, redirect_space_count: int, pipe_chars: str):
     file1_descriptor = make_descriptor(File("file1.txt"), RedirectionAppend())
     file2_descriptor = make_descriptor(File("file2.txt"), RedirectionAppend())
+
     def check(_line):
         first_cmd = parser.parse(_line)
         assert first_cmd.next_command is None
@@ -1274,7 +1280,7 @@ def test_unexpected_statement_finish(parser: Parser, line: str):
 @pytest.mark.parametrize("line,failure_pos", (
     ("cmd1 ; ;", 7),
     ("cmd1 arg1;;", 10),
-    ("cmd1 &&", 7), 
+    ("cmd1 &&", 7),
     ("cmd1 ||", 7),
     ("cmd1 'arg1 arg2' && &&", 22),
     ("cmd1 'arg1 || arg2' || ||", 25),

@@ -59,9 +59,9 @@ def test_default_file():
     test_stdin_file = DefaultFile(target=StdinTarget())
     assert repr(test_stdin_file) == "<DefaultFile target=stdin>"
     assert str(test_stdin_file) == "stdin"
-    assert test_stdin_file.is_stdin == True
-    assert test_stdin_file.is_stdout == False
-    assert test_stdin_file.is_stderr == False
+    assert test_stdin_file.is_stdin is True
+    assert test_stdin_file.is_stdout is False
+    assert test_stdin_file.is_stderr is False
 
     with pytest.raises(FrozenInstanceError):
         test_stdin_file.target = StdoutTarget()
@@ -69,9 +69,9 @@ def test_default_file():
     test_stdout_file = DefaultFile(target=StdoutTarget())
     assert repr(test_stdout_file) == "<DefaultFile target=stdout>"
     assert str(test_stdout_file) == "stdout"
-    assert test_stdout_file.is_stdin == False
-    assert test_stdout_file.is_stdout == True
-    assert test_stdout_file.is_stderr == False
+    assert test_stdout_file.is_stdin is False
+    assert test_stdout_file.is_stdout is True
+    assert test_stdout_file.is_stderr is False
 
     with pytest.raises(FrozenInstanceError):
         test_stdout_file.target = StderrTarget()
@@ -79,9 +79,9 @@ def test_default_file():
     test_stderr_file = DefaultFile(target=StderrTarget())
     assert repr(test_stderr_file) == "<DefaultFile target=stderr>"
     assert str(test_stderr_file) == "stderr"
-    assert test_stderr_file.is_stdin == False
-    assert test_stderr_file.is_stdout == False
-    assert test_stderr_file.is_stderr == True
+    assert test_stderr_file.is_stdin is False
+    assert test_stderr_file.is_stdout is False
+    assert test_stderr_file.is_stderr is True
 
     with pytest.raises(FrozenInstanceError):
         test_stderr_file.target = StdinTarget()
