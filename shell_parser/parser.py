@@ -44,6 +44,7 @@ class Parser(object):
             cur_word += char
 
         def NEXT_CHAR(*, fail_if_end: bool = True) -> Optional[str]:
+            next_char: Optional[str]
             try:
                 next_char = statement[pos + 1]
             except IndexError:

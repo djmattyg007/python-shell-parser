@@ -6,7 +6,7 @@ import re
 from shell_parser.ast import *
 from shell_parser.formatter import Formatter
 from shell_parser.parser import *
-from typing import Mapping, Set, Tuple, Union
+from typing import AbstractSet, Mapping, Tuple, Union
 
 
 def make_match(msg: str) -> str:
@@ -19,7 +19,10 @@ def assert_single_cmd(cmd: Command):
     assert cmd.next_command_operator is None
 
 
-def make_descriptor(target: Union[File, DefaultFile], operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]) -> CommandDescriptor:
+def make_descriptor(
+        target: Union[File, DefaultFile],
+        operator: Union[RedirectionInput, RedirectionOutput, RedirectionAppend]
+    ) -> CommandDescriptor:
     file_descriptor = CommandFileDescriptor(
         target=target,
         operator=operator,
@@ -44,9 +47,9 @@ DEFAULT_DESCRIPTOR_STDERR = make_descriptor(DefaultFile(target=StderrTarget()), 
 def assert_descriptors(
         cmd: Command,
         *,
-        defaults: Set[int] = frozenset((0, 1, 2)),
+        defaults: AbstractSet[int] = frozenset((0, 1, 2)),
         files: Mapping[int, CommandDescriptor] = None,
-        closed: Set[int] = frozenset()
+        closed: AbstractSet[int] = frozenset()
     ):
     descriptors = cmd.descriptors.descriptors
     checked_fds = set()
@@ -788,7 +791,7 @@ def test_duplicating_descriptors(parser: Parser):
     ("cmd arg1 1000>&-", frozenset((1000,)), "cmd arg1 1000>&-"),
     ("cmd arg1 >&--", frozenset((1,)), "cmd arg1 - >&-"),
 ))
-def test_closing_descriptors(parser: Parser, line: str, descriptors: Set[int], expected_str: str):
+def test_closing_descriptors(parser: Parser, line: str, descriptors: AbstractSet[int], expected_str: str):
     first_cmd = parser.parse(line)
     assert_single_cmd(first_cmd)
     assert_descriptors(first_cmd, closed=descriptors)
@@ -1142,6 +1145,7 @@ def test_mixed_next_cmd_operators_with_pipes1(parser: Parser, formatter: Formatt
     assert first_cmd.args == tuple()
     assert_descriptors(first_cmd)
 
+    assert isinstance(first_cmd.pipe_command, Command)
     first_cmd_pipe_cmd1 = first_cmd.pipe_command
     assert first_cmd_pipe_cmd1.command == Word("cmd2")
     assert first_cmd_pipe_cmd1.args == tuple()
@@ -1149,12 +1153,14 @@ def test_mixed_next_cmd_operators_with_pipes1(parser: Parser, formatter: Formatt
     assert_single_cmd(first_cmd_pipe_cmd1)
 
     assert isinstance(first_cmd.next_command_operator, OperatorAnd)
+    assert isinstance(first_cmd.next_command, Command)
     second_cmd = first_cmd.next_command
     assert second_cmd.command == Word("cmd3")
     assert second_cmd.args == tuple()
     assert_descriptors(second_cmd)
 
     assert isinstance(second_cmd.next_command_operator, OperatorOr)
+    assert isinstance(second_cmd.next_command, Command)
     third_cmd = second_cmd.next_command
     assert third_cmd.command == Word("cmd4")
     assert third_cmd.args == tuple()
@@ -1168,11 +1174,13 @@ def test_mixed_next_cmd_operators_with_pipes2(parser: Parser, formatter: Formatt
     assert first_cmd.args == (Word("arg1"),)
     assert_descriptors(first_cmd)
 
+    assert isinstance(first_cmd.pipe_command, Command)
     first_cmd_pipe_cmd1 = first_cmd.pipe_command
     assert first_cmd_pipe_cmd1.command == Word("cmd2")
     assert first_cmd_pipe_cmd1.args == (Word("arg2"), Word("arg3"))
     assert_descriptors(first_cmd_pipe_cmd1)
 
+    assert isinstance(first_cmd_pipe_cmd1.pipe_command, Command)
     first_cmd_pipe_cmd2 = first_cmd_pipe_cmd1.pipe_command
     assert first_cmd_pipe_cmd2.command == Word("cmd3")
     assert first_cmd_pipe_cmd2.args == tuple()
@@ -1180,18 +1188,21 @@ def test_mixed_next_cmd_operators_with_pipes2(parser: Parser, formatter: Formatt
     assert_single_cmd(first_cmd_pipe_cmd2)
 
     assert isinstance(first_cmd.next_command_operator, OperatorAnd)
+    assert isinstance(first_cmd.next_command, Command)
     second_cmd = first_cmd.next_command
     assert second_cmd.command == Word("cmd4")
     assert second_cmd.args == tuple()
     assert_descriptors(second_cmd)
 
     assert second_cmd.next_command_operator is None
+    assert isinstance(second_cmd.next_command, Command)
     third_cmd = second_cmd.next_command
     assert third_cmd.command == Word("cmd5")
     assert third_cmd.args == tuple()
     assert_descriptors(third_cmd)
 
     assert isinstance(third_cmd.next_command_operator, OperatorOr)
+    assert isinstance(third_cmd.next_command, Command)
     fourth_cmd = third_cmd.next_command
     assert fourth_cmd.command == Word("cmd6")
     assert fourth_cmd.args == (Word("arg4"),)
@@ -1199,6 +1210,7 @@ def test_mixed_next_cmd_operators_with_pipes2(parser: Parser, formatter: Formatt
     assert fourth_cmd.next_command is None
     assert fourth_cmd.next_command_operator is None
 
+    assert isinstance(fourth_cmd.pipe_command, Command)
     fourth_cmd_pipe_cmd1 = fourth_cmd.pipe_command
     assert fourth_cmd_pipe_cmd1.command == Word("cmd7")
     assert fourth_cmd_pipe_cmd1.args == tuple()

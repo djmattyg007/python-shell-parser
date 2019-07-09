@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 from .ast import *
 
@@ -14,7 +14,7 @@ class Formatter(object):
 
     def format_statements(self, first_cmd: Command) -> Sequence[str]:
         statements = []
-        cmd = first_cmd
+        cmd: Optional[Command] = first_cmd
         while cmd:
             if cmd.next_command_operator is not None:
                 cur_cmd = cmd
