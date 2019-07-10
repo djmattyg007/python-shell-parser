@@ -1285,9 +1285,15 @@ def test_unexpected_statement_finish(parser: Parser, line: str):
     ("cmd1 arg1;;", 10),
     ("cmd1 &&", 7),
     ("cmd1 ||", 7),
-    ("cmd1 'arg1 arg2' && &&", 22),
-    ("cmd1 'arg1 || arg2' || ||", 25),
-    ("cmd1 'arg1 || arg2' \\|\\| || ||", 30),
+    ("cmd1 'arg1 arg2' && &&", 20),
+    ("cmd1 'arg1 arg2' \\&\\& &&", 24),
+    ("cmd1 'arg1 || arg2' || ||", 23),
+    ("cmd1 'arg1 || arg2' \\|\\| || ||", 28),
+    ("&& cmd2", 0),
+    ("|| cmd2", 0),
+    ("; cmd2", 0),
+    ("&\\& cmd2", 0),
+    ("|\\| cmd2", 0),
 ))
 def test_empty_statement(parser: Parser, line: str, failure_pos: int):
     with pytest.raises(EmptyStatementParserFailure) as excinfo:

@@ -244,7 +244,11 @@ class Parser(object):
                 if prev_char == "\\":
                     WRITE_CHAR(char)
                 else:
-                    # TODO: Make sure there is at least one word
+                    if len(cmd_builder.words) == 0 and not cur_word:
+                        raise EmptyStatementParserFailure(
+                            "Statement terminator found without any preceding statement.",
+                            pos=pos,
+                        )
 
                     END_WORD()
                     END_CMDARGS()
@@ -264,7 +268,11 @@ class Parser(object):
                 if prev_char == "\\":
                     WRITE_CHAR(char)
                 else:
-                    # TODO: Make sure there is at least one word
+                    if len(cmd_builder.words) == 0 and not cur_word:
+                        raise EmptyStatementParserFailure(
+                            "Statement terminator found without any preceding statement.",
+                            pos=pos,
+                        )
 
                     END_WORD()
                     END_CMDARGS()
