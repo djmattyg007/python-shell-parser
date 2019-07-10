@@ -181,7 +181,10 @@ class Parser(object):
                     WRITE_CHAR(char)
                 else:
                     if redirect_mode is not None and not cur_word:
-                        raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
+                        raise EmptyRedirectParserFailure(
+                            "No redirect filename provided.",
+                            pos=pos,
+                        )
 
                     END_WORD()
                     was_quote_mode = False
@@ -215,7 +218,10 @@ class Parser(object):
                     WRITE_CHAR(char)
                 else:
                     if redirect_mode is not None:
-                        raise EmptyRedirectParserFailure("No redirect filename provided.", pos=pos)
+                        raise EmptyRedirectParserFailure(
+                            "No redirect filename provided.",
+                            pos=pos,
+                        )
 
                     END_WORD()
                     was_quote_mode = False
