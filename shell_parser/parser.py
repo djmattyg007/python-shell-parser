@@ -18,7 +18,21 @@ def isdigit(s: str) -> bool:
 
 
 class Parser(object):
+    """
+    The main parser class, responsible for taking in the command line string
+    and outputting the command AST.
+    """
+
     def parse(self, statement: str) -> Command:
+        """
+        Parses the command line string.
+
+        :param statement: The full command-line string to be parsed.
+        :type statement: str
+        :returns: A fully processed Command AST object.
+        :rtype: Command
+        """
+
         statement = statement.strip()
         statement_len = len(statement)
         if statement_len == 0:
@@ -349,37 +363,81 @@ class Parser(object):
 
 
 class EmptyInputException(Exception):
-    pass
+    """
+    Raised by the :class:`Parser` class :func:`~Parser.parse()` if the
+    ``statement`` input is an empty string, or contains only whitespace.
+    """
 
 
 class ParserFailure(Exception):
+    """
+    A base class for all failures that can occur during the parsing process,
+    typically as the result of a syntax issue in the command-line statement.
+    """
+
     def __init__(self, message: str, pos: int):
+        """
+        A custom constructor that accepts the position at which the parsing
+        failure occurred.
+
+        :param message: The usual exception message parameter accepted by the
+                        base class.
+        :type message: str
+        :param pos: The string index representing the position where the parsing
+                    failure was detected.
+        :type pos: int
+        """
         super().__init__(message)
         self.pos = pos
 
 
 class UnclosedQuoteParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser if the end of the input string is reached and a
+    quoted string is still open.
+    """
 
 
 class EmptyStatementParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser if a statement terminator (eg ``;``, ``&``, ``|``)
+    is found, and there are no words in that statement. This can also be
+    raised if the end of the input string is reached and the same conditions
+    apply.
+    """
 
 
 class EmptyRedirectParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser when a statement terminator or redirection operator
+    is found, but the parser was expecting to find a redirection target. This
+    can also be raised if the end of the input string is reached and the same
+    conditions apply.
+    """
 
 
 class UnexpectedStatementFinishParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser when the input parsed so far necessitates at least
+    one more character to be present in the input string, but the end of the
+    input string has been reached.
+    """
 
 
 class InvalidRedirectionParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser when a redirection operator has been used in an
+    incorrect manner. At the moment, it is only raised when attempting to
+    duplicate a descriptor with the append redirect operator (``>>``).
+    """
 
 
 class AmbiguousRedirectParserFailure(ParserFailure):
-    pass
+    """
+    Raised by the parser when there is an attempt to duplicate a descriptor,
+    but the parser is unable to sensibly determine which descriptor should be
+    duplicated.
+    """
 
 
 __all__ = [

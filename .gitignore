@@ -1,5 +1,8 @@
 *.pyc
 *.pyo
+/dist/
+
+/docs/build/
 
 /.pytest_cache/
 /.coverage
