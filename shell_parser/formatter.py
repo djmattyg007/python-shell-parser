@@ -5,7 +5,7 @@ from .ast import Command
 
 class Formatter(object):
     """
-    The main formatter class, responsible for taking in :class:`Command`
+    The main formatter class, responsible for taking in :class:`shell_parser.ast.Command`
     objects and converting them into their canonical string representation.
     """
 

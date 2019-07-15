@@ -23,8 +23,8 @@ Shell Parser can be found on PyPI, and installed with pip:
 
 At the moment, Shell Parser only supports Python 3.7 and above.
 
-Example
-=======
+Examples
+========
 
 Parsing
 -------

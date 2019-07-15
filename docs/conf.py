@@ -35,6 +35,10 @@ exclude_patterns = ["build"]
 
 add_function_parentheses = True
 
+nitpick_ignore = [
+    ("py:class", "str"),
+]
+
 pygments_style = "sphinx"
 
 html_theme = "sphinx_rtd_theme"
